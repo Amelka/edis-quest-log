@@ -7,7 +7,7 @@ import { accessLog, dateOf, dayKey, elapsed, emptyLog, occurs, practiceTotals, q
 import type { Log, Performance, Quest } from './log'
 import './style.css'
 
-type Modal = { kind: 'add' } | { kind: 'quest'; quest: Quest; day: string } |
+type Modal = { kind: 'add' } | { kind: 'quest' | 'edit'; id: string; day: string } |
   { kind: 'event'; id: string } | { kind: 'card'; card: Card; special: boolean } | { kind: 'history' }
 
 const weekdayNames = ['Nd', 'Pn', 'Wt', 'Śr', 'Cz', 'Pt', 'So']
@@ -44,23 +44,28 @@ function Dialog({ title, children, close }: { title: string; children: ReactNode
   </dialog>
 }
 
-function AddForm({ day, save }: { day: string; save: (entry: Quest | Performance) => void }) {
+function EntryForm({ day, quest, suggestions, save }: {
+  day: string; quest?: Quest; suggestions: string[]; save: (entry: Quest | Performance) => void
+}) {
   const [kind, setKind] = useState('quest')
-  const [repeat, setRepeat] = useState('once')
-  const [start, setStart] = useState(day)
+  const [repeat, setRepeat] = useState(quest ? quest.weekdays.length === 7 ? 'daily' : quest.start === quest.end ? 'once' : 'weekly' : 'daily')
+  const [start, setStart] = useState(quest?.start ?? day)
+  const defaultEnd = dateOf(day)
+  defaultEnd.setDate(defaultEnd.getDate() + 6)
   const [error, setError] = useState('')
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     const data = new FormData(event.currentTarget)
     const value = (key: string) => String(data.get(key) ?? '').trim()
-    const title = value('title')
-    const common = { id: crypto.randomUUID(), title, xp: Number(value('xp')) }
-    if (!title || (kind === 'quest' && !value('piece'))) {
-      setError('Wpisz nazwę oraz, w przypadku questu, nazwę utworu.')
+    const start = value('start')
+    const title = value(kind === 'quest' ? 'piece' : 'title')
+    const common = { id: quest?.id ?? crypto.randomUUID(), xp: Number(value('xp')) }
+    if (!title) {
+      setError(kind === 'quest' ? 'Wpisz nazwę utworu.' : 'Wpisz nazwę występu.')
       return
     }
     if (kind === 'event') {
-      save({ ...common, day: start, rating: '', comment: '' })
+      save({ ...common, title, day: start, rating: '', comment: '' })
       return
     }
     const end = repeat === 'once' ? start : value('end')
@@ -70,31 +75,36 @@ function AddForm({ day, save }: { day: string; save: (entry: Quest | Performance
       setError('Wybierz przynajmniej jeden dzień, który wypada w podanym zakresie.')
       return
     }
-    save({ ...common, start, end, weekdays, piece: value('piece'), minutes: Number(value('minutes')), tips: value('tips') })
+    save({ ...common, start, end, weekdays, piece: title, minutes: Number(value('minutes')), tips: value('tips') })
   }
   return <form onSubmit={submit}>
-    <label>Rodzaj wpisu<select value={kind} onChange={event => { setKind(event.target.value); setError('') }}>
+    {!quest && <label>Rodzaj wpisu<select value={kind} onChange={event => { setKind(event.target.value); setError('') }}>
       <option value="quest">Quest ćwiczeniowy</option><option value="event">Występ lub konkurs</option>
-    </select></label>
-    <label>Nazwa<input name="title" required maxLength={100} placeholder={kind === 'quest' ? 'Nokturn — lewa ręka' : 'Koncert zimowy'} /></label>
-    {kind === 'quest' && <label>Utwór<input name="piece" required maxLength={100} placeholder="Nokturn Es-dur" /></label>}
+    </select></label>}
+    {kind === 'event' && <label>Nazwa<input name="title" required maxLength={100} placeholder="Koncert zimowy" /></label>}
+    {kind === 'quest' && <>
+      <label>Utwór<input name="piece" list="known-pieces" defaultValue={quest?.piece} required maxLength={100} placeholder="Nokturn Es-dur" /></label>
+      <datalist id="known-pieces">{suggestions.map(piece => <option key={piece} value={piece} />)}</datalist>
+    </>}
     <div className="form-row">
-      <label>Data<input type="date" required value={start} onChange={event => setStart(event.target.value)} /></label>
-      {kind === 'quest' && <label>Minuty<input name="minutes" type="number" min="1" max="240" defaultValue="10" required /></label>}
-      <label>XP<input key={kind} name="xp" type="number" min="1" max="9999" defaultValue={kind === 'quest' ? 20 : 100} required /></label>
+      <label>{kind === 'quest' && (repeat !== 'once' || quest) ? 'Data od' : 'Data'}<input name="start" type="date" required defaultValue={start} onInput={event => setStart(event.currentTarget.value)} /></label>
+      {kind === 'quest' && <label>Minuty<input name="minutes" type="number" min="1" max="240" defaultValue={quest?.minutes ?? 10} required /></label>}
+      <label>XP<input key={kind} name="xp" type="number" min="1" max="9999" defaultValue={kind === 'quest' ? quest?.xp ?? 20 : 100} required /></label>
     </div>
     {kind === 'quest' && <>
       <label>Powtarzanie<select value={repeat} onChange={event => { setRepeat(event.target.value); setError('') }}>
         <option value="once">Jednorazowo</option><option value="daily">Codziennie</option><option value="weekly">Wybrane dni tygodnia</option>
       </select></label>
-      {repeat !== 'once' && <label>Powtarzaj do<input name="end" type="date" min={start} defaultValue={start} required /></label>}
+      {(repeat !== 'once' || quest) && <label>Data do<input name="end" type="date" min={start}
+        value={repeat === 'once' ? start : undefined} defaultValue={repeat === 'once' ? undefined : quest?.end ?? dayKey(defaultEnd)}
+        key={repeat === 'once' ? 'once' : 'range'} disabled={repeat === 'once'} required /></label>}
       {repeat === 'weekly' && <fieldset><legend>Dni tygodnia</legend><div className="weekdays">
-        {[1, 2, 3, 4, 5, 6, 0].map(index => <label key={index}><input type="checkbox" name="weekday" value={index} />{weekdayNames[index]}</label>)}
+        {[1, 2, 3, 4, 5, 6, 0].map(index => <label key={index}><input type="checkbox" name="weekday" value={index} defaultChecked={quest?.weekdays.includes(index)} />{weekdayNames[index]}</label>)}
       </div></fieldset>}
-      <label>Wskazówki nauczyciela<textarea name="tips" rows={3} maxLength={1500} /></label>
+      <label>Wskazówki nauczyciela<textarea name="tips" defaultValue={quest?.tips} rows={3} maxLength={1500} /></label>
     </>}
     {error && <p role="alert" className="error">{error}</p>}
-    <button className="primary">Zapisz w planie</button>
+    <button className="primary">{quest ? 'Zapisz zmiany' : 'Zapisz w planie'}</button>
   </form>
 }
 
@@ -113,7 +123,7 @@ function AlbumRow({ cards, log, available, special, open, reveal }: {
   const count = cards.filter(card => log.revealed.includes(card.id)).length
   const next = cards.find(card => !log.revealed.includes(card.id))
   return <section className={'album-row ' + (special ? 'special' : '')}>
-    <div className="split"><h3>{special ? 'Kompozytorzy' : 'Stworki muzyczne'}</h3><span className="count">{count} / {cards.length}</span></div>
+    <div className="split"><h3>{special ? 'Karty specjalne' : 'Karty zwykłe'}</h3><span className="count">{count} / {cards.length}</span></div>
     <div className="card-grid">{cards.map((card, index) => {
       const unlocked = log.revealed.includes(card.id)
       return unlocked ? <button className="card-slot unlocked" key={card.id} onClick={() => open(card, special)}>
@@ -214,7 +224,10 @@ function App() {
     }
   }, [selected, today])
   const running = log.timer && log.timer.deadline > now ? log.timer : undefined
-  const currentQuest = modal?.kind === 'quest' ? modal : null
+  const modalQuest = modal?.kind === 'quest' || modal?.kind === 'edit' ? log.quests.find(quest => quest.id === modal.id) : undefined
+  const currentQuest = modal?.kind === 'quest' && modalQuest ? { quest: modalQuest, day: modal.day } : null
+  const suggestions = [...new Set([...log.quests.map(quest => quest.piece), ...pieces.keys()])]
+    .sort((a, b) => a.localeCompare(b, 'pl'))
   const currentKey = currentQuest ? questKey(currentQuest.quest, currentQuest.day) : ''
   const remaining = currentQuest ? Math.max(0, currentQuest.quest.minutes * 60000 - elapsed(log, currentKey, now)) : 0
   const seconds = Math.ceil(remaining / 1000)
@@ -238,9 +251,11 @@ function App() {
       const time = Date.now()
       if (state.timer?.questKey === key) { settleTimer(state, time); return }
       if (state.timer) throw new Error('Zatrzymaj najpierw timer drugiego questu.')
-      const left = quest.minutes * 60000 - elapsed(state, key, time)
+      const planned = state.quests.find(item => item.id === quest.id)
+      if (!planned || !occurs(planned, day)) throw new Error('Quest nie jest już zaplanowany na ten dzień.')
+      const left = planned.minutes * 60000 - elapsed(state, key, time)
       if (left > 0 && !(key in state.completed) && day <= dayKey()) {
-        state.timer = { questKey: key, piece: quest.piece, start: time, deadline: time + left }
+        state.timer = { questKey: key, piece: planned.piece, start: time, deadline: time + left }
       }
     })
   }
@@ -249,12 +264,17 @@ function App() {
     const key = questKey(quest, day)
     let awarded = false
     void update(state => {
-      if (key in state.completed || elapsed(state, key, Date.now()) < quest.minutes * 60000) return
-      state.completed[key] = quest.xp
+      const planned = state.quests.find(item => item.id === quest.id)
+      if (!planned || !occurs(planned, day)) throw new Error('Quest nie jest już zaplanowany na ten dzień.')
+      if (key in state.completed) return
+      if (elapsed(state, key, Date.now()) < planned.minutes * 60000) {
+        throw new Error('Dokończ ćwiczenie przed zaliczeniem questu.')
+      }
+      state.completed[key] = planned.xp
       awarded = true
     }, state => {
       if (awarded) setNotice(state.quests.filter(item => occurs(item, day)).every(item => questKey(item, day) in state.completed)
-        ? '✓ Plan dnia ukończony! +' + quest.xp + ' XP' : '✓ Quest ukończony! +' + quest.xp + ' XP')
+        ? '✓ Plan dnia ukończony! +' + state.completed[key] + ' XP' : '✓ Quest ukończony! +' + state.completed[key] + ' XP')
       setModal(null)
     })
   }
@@ -267,71 +287,65 @@ function App() {
   return <>
     <header className="top"><div className="wrap top-inner"><a className="brand" href="#main"><span>♫</span> Edi’s Quest Log</a><span className="top-label">GILDIA MUZYCZNA</span></div></header>
     <main className="wrap" id="main">
-      <section className="hero">
-        <div className="hero-copy"><span className="eyebrow"><i /> DZIENNIK GILDII</span><h1>Ćwicz dziś<br />śmiało<span>.</span></h1>
-          <p>Każdy quest przybliża cię do odkrycia nowej karty.</p>
-          <button className="primary" disabled={!loaded} onClick={() => { chooseToday(); document.getElementById('quests')?.scrollIntoView({ block: 'start' }) }}>↓ Zobacz dzisiejsze questy</button>
-        </div>
-        <div className="hero-art" aria-hidden="true" />
-      </section>
-      {error && !modal && <div className="error" role="alert">{error} {!loaded && <button onClick={() => void load()}>Spróbuj ponownie</button>}</div>}
-      <p className="notice" role="status">{notice}</p>
-      <div className="dashboard">
-        <div className="main-column">
-          <section className="panel calendar" aria-labelledby="calendar-heading">
-            <div className="split"><div><div className="eyebrow">01 / PLAN</div><h2 id="calendar-heading">Kalendarz</h2></div>
-              <div className="calendar-controls"><button onClick={() => {
-                const earlier = dateOf(timeline[0]); earlier.setDate(earlier.getDate() - 7); setSelected(dayKey(earlier))
-                axis.current?.scrollTo({ left: 0 })
-              }} aria-label="Pokaż wcześniejszy tydzień">‹</button><button onClick={chooseToday}>Dziś</button><button onClick={() => axis.current?.scrollBy({ left: 290 })} aria-label="Przewiń kalendarz w prawo">›</button></div>
-            </div>
-            <div className="axis" ref={axis}>{timeline.map(day => {
-              const date = dateOf(day)
-              const special = log.performances.some(event => event.day === day)
-              return <button key={day} aria-current={day === today ? 'date' : undefined} aria-pressed={day === selected}
-                aria-label={fullDate.format(date) + (special ? ', występ' : '')}
-                className={['day', day < today && 'past', [0, 6].includes(date.getDay()) && 'weekend', day === today && 'today'].filter(Boolean).join(' ')}
-                onClick={() => setSelected(day)}><small>{weekdayNames[date.getDay()]}</small><strong>{date.getDate()}</strong>{special && <i>◆</i>}</button>
-            })}</div>
-          </section>
-          <section id="quests" className="panel quests" aria-labelledby="quests-heading">
-            <div className="split quest-heading"><div><div className="eyebrow">02 / ZADANIA · {formatDate.format(dateOf(selected))}</div>
-              <h2 id="quests-heading">{selected === today ? 'Questy na dziś' : 'Questy tego dnia'}</h2></div>
-              <button className="primary" disabled={!loaded} onClick={() => setModal({ kind: 'add' })}>＋ Dodaj wpis</button></div>
-            {running && !quests.some(quest => questKey(quest, selected) === running.questKey) && <p className="album-note">Timer działa w innym queście. <button onClick={() => {
-              const [id, day] = running.questKey.split('/')
-              const quest = log.quests.find(item => item.id === id)
-              if (quest) setModal({ kind: 'quest', quest, day })
-            }}>Otwórz timer</button></p>}
-            {!quests.length && !events.length && <div className="empty"><span aria-hidden="true">♫</span><h3>{loaded ? 'Plan jest pusty' : 'Wczytuję dziennik…'}</h3><p>{loaded ? 'Dodaj quest lub występ, żeby zaplanować kolejny krok.' : 'Za chwilę pokażę twój plan.'}</p></div>}
-            {quests.length > 0 && <p className="album-note">{completed} / {quests.length} ukończonych{completed === quests.length && ' · ✓ Plan dnia ukończony'}</p>}
-            {quests.map(quest => {
-              const key = questKey(quest, selected)
-              const done = key in log.completed
-              return <button className="entry" key={key} onClick={() => setModal({ kind: 'quest', quest, day: selected })}>
-                <span className={'entry-icon ' + (done ? 'done' : '')}>{done ? '✓' : '♫'}</span>
-                <span><strong>{quest.title}</strong><small>{quest.piece} · {quest.minutes} min{done ? ' · Ukończony' : running?.questKey === key ? ' · Trwa ćwiczenie' : ''}</small></span>
-                <b>+{quest.xp} XP</b>
-              </button>
-            })}
-            {events.map(event => <button className="entry event" key={event.id} onClick={() => setModal({ kind: 'event', id: event.id })}>
-              <span className="entry-icon">◆</span><span><strong>{event.title}</strong><small>{event.id in log.completed ? 'Ukończony występ' : 'Występ · karta specjalna'}</small></span><b>+{event.xp} XP</b>
-            </button>)}
-          </section>
-        </div>
-        <aside className="panel profile" aria-labelledby="profile-heading">
+      <section className="panel profile" aria-labelledby="profile-heading">
+        <div>
           <div className="profile-title"><div className="avatar" aria-hidden="true">E</div><div><div className="eyebrow">GRACZ</div><h2 id="profile-heading">Edi</h2></div><strong className="xp">{xp} XP</strong></div>
           <div className="split"><span>Do następnej karty</span><b>{xp % 100} / 100 XP</b></div>
           <progress max={100} value={xp % 100} aria-label="Postęp do następnej karty" />
           {earned > 0 && <a className="reward-link" href="#album">✧ Czekające odkrycia: {earned}</a>}
-          <hr /><h3>Twoja praktyka</h3><p className="album-note">Dzisiaj: <strong>{minutes(days.get(today) ?? 0)} min</strong></p>
+        </div>
+        <div><h3>Twoja praktyka</h3><p className="album-note">Dzisiaj: <strong>{minutes(days.get(today) ?? 0)} min</strong></p>
           {pieces.size === 0 && <p className="album-note">Tu pojawi się czas ćwiczeń dla każdego utworu.</p>}
           {[...pieces].sort((a, b) => b[1] - a[1]).map(([piece, duration]) => <div className="piece" key={piece}>
             <div className="split"><span>{piece}</span><b>{minutes(duration)} min</b></div>
             <progress max={Math.max(...pieces.values())} value={duration} aria-label={'Czas ćwiczeń: ' + piece} />
           </div>)}
           <button className="history" disabled={!loaded} onClick={() => setModal({ kind: 'history' })}>Historia ćwiczeń i występów →</button>
-        </aside>
+        </div>
+      </section>
+      {error && !modal && <div className="error" role="alert">{error} {!loaded && <button onClick={() => void load()}>Spróbuj ponownie</button>}</div>}
+      <p className="notice" role="status">{notice}</p>
+      <div className="main-column">
+        <section className="panel calendar" aria-labelledby="calendar-heading">
+          <div className="split"><div><div className="eyebrow">01 / PLAN</div><h2 id="calendar-heading">Kalendarz</h2></div>
+            <div className="calendar-controls"><button onClick={() => {
+              const earlier = dateOf(timeline[0]); earlier.setDate(earlier.getDate() - 7); setSelected(dayKey(earlier))
+              axis.current?.scrollTo({ left: 0 })
+            }} aria-label="Pokaż wcześniejszy tydzień">‹</button><button onClick={chooseToday}>Dziś</button><button onClick={() => axis.current?.scrollBy({ left: 290 })} aria-label="Przewiń kalendarz w prawo">›</button></div>
+          </div>
+          <div className="axis" ref={axis}>{timeline.map(day => {
+            const date = dateOf(day)
+            const special = log.performances.some(event => event.day === day)
+            return <button key={day} aria-current={day === today ? 'date' : undefined} aria-pressed={day === selected}
+              aria-label={fullDate.format(date) + (special ? ', występ' : '')}
+              className={['day', day < today && 'past', [0, 6].includes(date.getDay()) && 'weekend', day === today && 'today', special && 'performance-day'].filter(Boolean).join(' ')}
+              onClick={() => setSelected(day)}><small>{weekdayNames[date.getDay()]}</small><strong>{date.getDate()}</strong>{special && <i>◆</i>}</button>
+          })}</div>
+        </section>
+        <section id="quests" className="panel quests" aria-labelledby="quests-heading">
+          <div className="split quest-heading"><div><div className="eyebrow">02 / ZADANIA · {formatDate.format(dateOf(selected))}</div>
+            <h2 id="quests-heading">{selected === today ? 'Questy na dziś' : 'Questy tego dnia'}</h2></div>
+            <button className="primary" disabled={!loaded} onClick={() => setModal({ kind: 'add' })}>＋ Dodaj wpis</button></div>
+          {running && !quests.some(quest => questKey(quest, selected) === running.questKey) && <p className="album-note">Timer działa w innym queście. <button onClick={() => {
+            const [id, day] = running.questKey.split('/')
+            const quest = log.quests.find(item => item.id === id)
+            if (quest) setModal({ kind: 'quest', id: quest.id, day })
+          }}>Otwórz timer</button></p>}
+          {!quests.length && !events.length && <div className="empty"><span aria-hidden="true">♫</span><h3>{loaded ? 'Plan jest pusty' : 'Wczytuję dziennik…'}</h3><p>{loaded ? 'Dodaj quest lub występ, żeby zaplanować kolejny krok.' : 'Za chwilę pokażę twój plan.'}</p></div>}
+          {quests.length > 0 && <p className="album-note">{completed} / {quests.length} ukończonych{completed === quests.length && ' · ✓ Plan dnia ukończony'}</p>}
+          {quests.map(quest => {
+            const key = questKey(quest, selected)
+            const done = key in log.completed
+            return <button className="entry" key={key} onClick={() => setModal({ kind: 'quest', id: quest.id, day: selected })}>
+              <span className={'entry-icon ' + (done ? 'done' : '')}>{done ? '✓' : '♫'}</span>
+              <span><strong>{quest.piece}</strong><small>{quest.minutes} min{done ? ' · Ukończony' : running?.questKey === key ? ' · Trwa ćwiczenie' : ''}</small></span>
+              <b>+{done ? log.completed[key] : quest.xp} XP</b>
+            </button>
+          })}
+          {events.map(event => <button className="entry event" key={event.id} onClick={() => setModal({ kind: 'event', id: event.id })}>
+            <span className="entry-icon">◆</span><span><strong>{event.title}</strong><small>{event.id in log.completed ? 'Ukończony występ' : 'Występ · karta specjalna'}</small></span><b>+{event.xp} XP</b>
+          </button>)}
+        </section>
       </div>
       <section className="panel album" id="album" aria-labelledby="album-heading">
         <div className="eyebrow">03 / KOLEKCJA</div><h2 id="album-heading">Album kart</h2>
@@ -341,15 +355,31 @@ function App() {
         </div>
       </section>
     </main>
-    {modal && <Dialog key={modal.kind} title={modal.kind === 'add' ? 'Dodaj do planu' : modal.kind === 'quest' ? modal.quest.title :
+    {modal && <Dialog key={modal.kind} title={modal.kind === 'add' ? 'Dodaj do planu' : modal.kind === 'edit' ? 'Edytuj quest' : modal.kind === 'quest' ? modalQuest?.piece ?? 'Quest' :
       modal.kind === 'event' ? currentEvent?.title ?? 'Występ' : modal.kind === 'card' ? modal.card.name : 'Historia praktyki'} close={() => { setModal(null); setError('') }}>
       {error && <p className="error" role="alert">{error}</p>}
-      {modal.kind === 'add' && <AddForm day={selected} save={entry => void update(state => {
+      {modal.kind === 'add' && <EntryForm day={selected} suggestions={suggestions} save={entry => void update(state => {
         if ('piece' in entry) state.quests.push(entry)
         else state.performances.push(entry)
       }, () => { setSelected('piece' in entry ? entry.start : entry.day); setModal(null); setNotice('✓ Wpis dodany do planu.') })} />}
+      {modal.kind === 'edit' && modalQuest && <EntryForm day={modal.day} quest={modalQuest} suggestions={suggestions} save={entry => void update(state => {
+        const index = state.quests.findIndex(quest => quest.id === entry.id)
+        if (index < 0 || !('piece' in entry)) return
+        if (state.timer?.questKey.startsWith(entry.id + '/')) {
+          throw new Error('Zatrzymaj timer tego questu przed zapisaniem zmian.')
+        }
+        state.quests[index] = entry
+      }, () => {
+        if ('piece' in entry && !occurs(entry, modal.day)) {
+          const date = dateOf(entry.start)
+          while (!occurs(entry, dayKey(date))) date.setDate(date.getDate() + 1)
+          setSelected(dayKey(date))
+        }
+        setModal(null)
+        setNotice('✓ Zmiany questu zapisane.')
+      })} />}
       {currentQuest && <>
-        <p className="eyebrow">{currentQuest.quest.piece} · +{currentQuest.quest.xp} XP</p>
+        <p className="eyebrow">+{log.completed[currentKey] ?? currentQuest.quest.xp} XP</p>
         {currentQuest.quest.tips && <p className="tips">{currentQuest.quest.tips}</p>}
         <output className="timer" role="timer" aria-label="Pozostały czas">{Math.floor(seconds / 60)}:{String(seconds % 60).padStart(2, '0')}</output>
         {currentKey in log.completed ? <p className="success">✓ Quest ukończony</p> : <>
@@ -361,6 +391,9 @@ function App() {
           </button>}
           {remaining === 0 && <button className="primary" onClick={() => completeQuest(currentQuest.quest, currentQuest.day)}>✓ Oznacz quest jako ukończony</button>}
         </>}
+        <div className="quest-actions">
+          <button onClick={() => setModal({ kind: 'edit', id: currentQuest.quest.id, day: currentQuest.day })}>Edytuj</button>
+        </div>
       </>}
       {currentEvent && <EventDetails key={currentEvent.id} event={currentEvent} today={today} done={currentEvent.id in log.completed}
         save={(rating, comment) => void update(state => {

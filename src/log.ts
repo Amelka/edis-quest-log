@@ -1,6 +1,5 @@
 export type Quest = {
   id: string
-  title: string
   piece: string
   minutes: number
   xp: number

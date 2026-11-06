@@ -15,4 +15,4 @@ Otwórz http://localhost:5173. Używaj tego samego adresu i profilu przeglądark
 
 Polecenie `npm run build` sprawdza typy i tworzy gotową wersję w `dist/`. Możesz ją uruchomić przez `npm run preview` po zatrzymaniu serwera deweloperskiego.
 
-Ilustracje Forte, Chopina i nagłówka pochodzą z moodboardu Pikselowa gildia v2. Licencje fontów znajdują się w katalogu `public/art`.
+Ilustracje Forte i Chopina pochodzą z moodboardu Pikselowa gildia v2. Licencje fontów znajdują się w katalogu `public/art`.
