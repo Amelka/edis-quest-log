@@ -3,7 +3,7 @@ import type { FormEvent, ReactNode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { regularCards, specialCards } from './cards'
 import type { Card } from './cards'
-import { accessLog, dateOf, dayKey, elapsed, emptyLog, occurs, practiceTotals, questKey, settleTimer, specialEarned, totalXP } from './log'
+import { accessLog, dateOf, dayKey, elapsed, emptyLog, moveQuest, occurs, practiceTotals, questKey, questsForDay, settleTimer, specialEarned, totalXP } from './log'
 import type { Log, Performance, Quest } from './log'
 import './style.css'
 
@@ -75,9 +75,10 @@ function EntryForm({ day, quest, suggestions, save }: {
     const data = new FormData(event.currentTarget)
     const value = (key: string) => String(data.get(key) ?? '').trim()
     const start = value('start')
-    const title = value(kind === 'quest' ? 'piece' : 'title')
+    const title = value('title')
+    const piece = value('piece')
     const common = { id: quest?.id ?? crypto.randomUUID(), xp: Number(value('xp')) }
-    if (!title) {
+    if (!(kind === 'quest' ? piece : title)) {
       setError(kind === 'quest' ? 'Wpisz nazwę utworu.' : 'Wpisz nazwę występu.')
       return
     }
@@ -92,13 +93,14 @@ function EntryForm({ day, quest, suggestions, save }: {
       setError('Wybierz przynajmniej jeden dzień, który wypada w podanym zakresie.')
       return
     }
-    save({ ...common, start, end, weekdays, piece: title, minutes: Number(value('minutes')), tips: value('tips') })
+    save({ ...common, start, end, weekdays, title, piece, minutes: Number(value('minutes')), tips: value('tips') })
   }
   return <form onSubmit={submit}>
     {!quest && <label>Rodzaj wpisu<select value={kind} onChange={event => { setKind(event.target.value); setError('') }}>
       <option value="quest">Quest ćwiczeniowy</option><option value="event">Występ lub konkurs</option>
     </select></label>}
-    {kind === 'event' && <label>Nazwa<input name="title" required maxLength={100} placeholder="Koncert zimowy" /></label>}
+    <label>Nazwa<input key={kind} name="title" defaultValue={quest?.title} required={kind === 'event'} maxLength={100}
+      placeholder={kind === 'quest' ? 'Opcjonalnie, np. Lewa ręka' : 'Koncert zimowy'} /></label>
     {kind === 'quest' && <>
       <label>Utwór<input name="piece" list="known-pieces" defaultValue={quest?.piece} required maxLength={100} placeholder="Nokturn Es-dur" /></label>
       <datalist id="known-pieces">{suggestions.map(piece => <option key={piece} value={piece} />)}</datalist>
@@ -178,6 +180,7 @@ function App() {
   const [now, setNow] = useState(Date.now)
   const today = dayKey(new Date(now))
   const [selected, setSelected] = useState(dayKey)
+  const [drag, setDrag] = useState<{ day: string; questId: string; targetId?: string } | null>(null)
   const [modal, setModal] = useState<Modal | null>(null)
   const [notice, setNotice] = useState('')
   const [error, setError] = useState('')
@@ -191,7 +194,7 @@ function App() {
       setLoaded(true)
       setError('')
     } catch {
-      setError('Nie udało się odczytać dziennika. Sprawdź dostęp do pamięci przeglądarki i spróbuj ponownie.')
+      setError('Nie udało się odczytać dziennika. Sprawdź, czy lokalny serwer działa, i odśwież stronę.')
     }
   }
 
@@ -200,8 +203,15 @@ function App() {
     const broadcast = new BroadcastChannel('edis-quest-log')
     channel.current = broadcast
     broadcast.onmessage = () => void load()
+    const refresh = () => { if (!busy.current) void load() }
+    window.addEventListener('focus', refresh)
     const interval = window.setInterval(() => setNow(Date.now()), 250)
-    return () => { broadcast.close(); channel.current = null; window.clearInterval(interval) }
+    return () => {
+      broadcast.close()
+      channel.current = null
+      window.removeEventListener('focus', refresh)
+      window.clearInterval(interval)
+    }
   }, [])
 
   async function update(change: (state: Log) => void, after?: (state: Log) => void) {
@@ -224,7 +234,7 @@ function App() {
   const xp = totalXP(log)
   const earned = Math.floor(xp / 100) - regularCards.filter(card => log.revealed.includes(card.id)).length
   const specials = specialEarned(log) - specialCards.filter(card => log.revealed.includes(card.id)).length
-  const quests = log.quests.filter(quest => occurs(quest, selected))
+  const quests = questsForDay(log, selected)
   const events = log.performances.filter(event => event.day === selected)
   const completed = quests.filter(quest => questKey(quest, selected) in log.completed).length
   const timeline = dateRange(today, selected)
@@ -249,6 +259,12 @@ function App() {
   const remaining = currentQuest ? Math.max(0, currentQuest.quest.minutes * 60000 - elapsed(log, currentKey, now)) : 0
   const seconds = Math.ceil(remaining / 1000)
   const currentEvent = modal?.kind === 'event' ? log.performances.find(event => event.id === modal.id) : undefined
+
+  function reorderQuest(questId: string, targetId: string) {
+    if (questId === targetId) return
+    void update(state => moveQuest(state, selected, questId, targetId),
+      () => setNotice('✓ Kolejność questów zapisana.'))
+  }
 
   function reveal(special: boolean) {
     let card: Card | undefined
@@ -357,14 +373,48 @@ function App() {
             }}>Otwórz timer</button></p>}
             {!quests.length && !events.length && <div className="empty"><span aria-hidden="true">♫</span><h3>{loaded ? 'Plan jest pusty' : 'Wczytuję dziennik…'}</h3><p>{loaded ? 'Dodaj quest lub występ, żeby zaplanować kolejny krok.' : 'Za chwilę pokażę twój plan.'}</p></div>}
             {quests.length > 0 && <p className="album-note">{completed} / {quests.length} ukończonych{completed === quests.length && ' · ✓ Plan dnia ukończony'}</p>}
-            {quests.map(quest => {
+            {quests.map((quest, index) => {
               const key = questKey(quest, selected)
               const done = key in log.completed
-              return <button className="entry" key={key} onClick={() => setModal({ kind: 'quest', id: quest.id, day: selected })}>
-                <span className={'entry-icon ' + (done ? 'done' : '')}>{done ? '✓' : '♫'}</span>
-                <span><strong>{quest.piece}</strong><small>{quest.minutes} min{done ? ' · Ukończony' : running?.questKey === key ? ' · Trwa ćwiczenie' : ''}</small></span>
-                <b>+{done ? log.completed[key] : quest.xp} XP</b>
-              </button>
+              const title = quest.title || quest.piece
+              const canReorder = quests.length > 1
+              const activeDrag = drag?.day === selected ? drag : null
+              const isTarget = activeDrag?.targetId === quest.id && activeDrag.questId !== quest.id
+              const sourceIndex = quests.findIndex(item => item.id === activeDrag?.questId)
+              const targetClass = isTarget ? (sourceIndex < index ? ' drop-after' : ' drop-before') : ''
+
+              return <div className={'quest-row' + targetClass} key={key}
+                onDragOver={event => {
+                  if (!activeDrag || activeDrag.questId === quest.id) return
+                  event.preventDefault()
+                  event.dataTransfer.dropEffect = 'move'
+                  if (!isTarget) setDrag({ ...activeDrag, targetId: quest.id })
+                }}
+                onDragLeave={event => {
+                  if (isTarget && !(event.relatedTarget instanceof Node && event.currentTarget.contains(event.relatedTarget))) {
+                    setDrag({ ...activeDrag, targetId: undefined })
+                  }
+                }}
+                onDrop={event => {
+                  if (!activeDrag) return
+                  event.preventDefault()
+                  setDrag(null)
+                  reorderQuest(activeDrag.questId, quest.id)
+                }}>
+                <button className="entry" onClick={() => setModal({ kind: 'quest', id: quest.id, day: selected })}>
+                  <span className={'entry-icon ' + (done ? 'done' : '')}>{done ? '✓' : '♫'}</span>
+                  <span><strong>{title}</strong><small>{title !== quest.piece ? quest.piece + ' · ' : ''}{quest.minutes} min{done ? ' · Ukończony' : running?.questKey === key ? ' · Trwa ćwiczenie' : ''}</small></span>
+                  <b>+{done ? log.completed[key] : quest.xp} XP</b>
+                </button>
+                {canReorder && <span className="quest-grip" draggable aria-hidden="true" title="Przeciągnij, aby zmienić kolejność"
+                  onDragStart={event => {
+                    event.dataTransfer.effectAllowed = 'move'
+                    event.dataTransfer.setData('text/plain', title)
+                    const row = event.currentTarget.closest('.quest-row')
+                    if (row) event.dataTransfer.setDragImage(row, 16, 16)
+                    setDrag({ day: selected, questId: quest.id })
+                  }} onDragEnd={() => setDrag(null)}>⠿</span>}
+              </div>
             })}
             {events.map(event => <button className="entry event" key={event.id} onClick={() => setModal({ kind: 'event', id: event.id })}>
               <span className="entry-icon"><Gem /></span><span><strong>{event.title}</strong><small>{event.id in log.completed ? 'Ukończony występ' : 'Występ · karta specjalna'}</small></span><b>+{event.xp} XP</b>
@@ -380,7 +430,7 @@ function App() {
         </section>
       </div>
     </main>
-    {modal && <Dialog key={modal.kind} title={modal.kind === 'add' ? 'Dodaj do planu' : modal.kind === 'edit' ? 'Edytuj quest' : modal.kind === 'quest' ? modalQuest?.piece ?? 'Quest' :
+    {modal && <Dialog key={modal.kind} title={modal.kind === 'add' ? 'Dodaj do planu' : modal.kind === 'edit' ? 'Edytuj quest' : modal.kind === 'quest' ? (modalQuest?.title || modalQuest?.piece || 'Quest') :
       modal.kind === 'event' ? currentEvent?.title ?? 'Występ' : modal.kind === 'card' ? modal.card.name : 'Historia praktyki'}
       close={() => { setModal(null); setError('') }}
       cardMode={modal.kind === 'card' ? modal.discovering ? 'discovery' : 'preview' : undefined}

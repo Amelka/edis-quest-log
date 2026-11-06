@@ -2,17 +2,22 @@
 
 Lokalny dziennik ćwiczeń fortepianowych z questami, timerem, XP i albumem kart.
 
-Na Macu otwórz w Finderze plik **Uruchom dziennik.command**. Otworzy się przeglądarka. Zostaw okno serwera otwarte podczas ćwiczeń. Ten sposób uruchamia gotowy build z folderu `dist/` za pomocą Pythona 3.
+Na Macu otwórz w Finderze plik **Edi's Quest Log.command**. Otworzy się przeglądarka. Zostaw okno serwera otwarte podczas ćwiczeń. Ten sposób uruchamia gotowy build z folderu `dist/` za pomocą Pythona 3.
 
-Do pracy nad kodem potrzebujesz Node.js 22 i npm. W katalogu projektu uruchom:
+Dziennik zapisuje questy, XP i historię ćwiczeń w pliku `.journal/journal.json`
+we współdzielonym folderze aplikacji. Konta Amelia i Edi mają dostęp do
+tego samego zapisu, także z różnych przeglądarek. Plik
+`journal.previous.json` obok dziennika zawiera poprzedni zapis (po pierwszym
+zapisie zawiera jego kopię). Możesz objąć ten folder kopią Time Machine.
 
-```sh
-npm ci
-npm run dev
-```
+Adres otwiera się automatycznie i może być inny na każdym koncie.
 
-Otwórz http://localhost:5173. Używaj tego samego adresu i profilu przeglądarki, aby wracać do swojej historii. Dane są zapisywane w IndexedDB. Wyczyszczenie danych tej witryny usuwa historię.
+Do pracy nad kodem potrzebujesz Node.js 22 i npm. W katalogu projektu uruchom
+`npm ci`, a potem `npm run build`, aby sprawdzić typy i zbudować gotową
+wersję. Uruchom ją dwuklikiem lub przez `npm run preview`.
 
-Polecenie `npm run build` sprawdza typy i tworzy gotową wersję w `dist/`. Możesz ją uruchomić przez `npm run preview` po zatrzymaniu serwera deweloperskiego.
+`npm run dev` otwiera osobną wersję deweloperską pod adresem
+http://localhost:5174. Używa ona oddzielnego zapisu w przeglądarce, dzięki
+czemu testowe wpisy nie trafiają do właściwego dziennika.
 
 Ilustracje Forte i Chopina pochodzą z moodboardu Pikselowa gildia v2. Licencje fontów znajdują się w katalogu `public/art`.

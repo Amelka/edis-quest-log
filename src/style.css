@@ -303,3 +303,41 @@ fieldset{margin:0;border:1px solid var(--line)}
   .discovery .card-presentation { transform: rotateY(180deg); }
   .discovery::backdrop { --spark-distance: 28%; opacity: .55; }
 }
+
+.quest-row {
+  position: relative;
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.quest-row .entry {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+}
+
+.quest-row.drop-before::after,
+.quest-row.drop-after::after {
+  position: absolute;
+  inset-inline: 0;
+  height: 3px;
+  background: var(--accent);
+  content: '';
+  pointer-events: none;
+}
+
+.quest-row.drop-before::after { top: -5px; }
+.quest-row.drop-after::after { bottom: -5px; }
+
+.quest-grip {
+  display: grid;
+  place-items: center;
+  flex: 0 0 26px;
+  border: 1px solid var(--line);
+  color: var(--muted);
+  cursor: grab;
+  user-select: none;
+}
+
+.quest-grip:active { cursor: grabbing; }
