@@ -87,6 +87,7 @@ progress::-moz-progress-bar{background:var(--accent)}
 dialog{width:min(540px,calc(100% - 30px));max-height:calc(100% - 36px);background:var(--panel);color:var(--ink);border:2px solid var(--line);padding:24px;overflow:auto}
 dialog::backdrop{background:#090617d9}
 .dialog-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:16px}
+.dialog-actions{display:flex;align-items:stretch;flex-shrink:0;gap:8px}
 .icon{font-size:1.3rem;min-width:42px}
 form{display:grid;gap:13px}
 form label{display:grid;gap:4px;color:var(--muted);font-size:.84rem;min-width:0}
@@ -97,8 +98,7 @@ fieldset{margin:0;border:1px solid var(--line)}
 .weekdays label{display:flex;align-items:center}
 .weekdays input{width:18px;min-height:18px;accent-color:var(--accent)}
 .tips{white-space:pre-wrap}
-.timer{display:block;font:400 clamp(3rem,12vw,5rem) var(--heading);color:var(--today);margin:10px 0 20px}
-.quest-actions{margin-top:16px}
+.timer{display:block;font:400 clamp(3rem,24vw,9.5rem)/1.05 var(--heading);color:var(--today);margin:10px 0 20px;text-align:center}
 .success{color:var(--accent)}
 .error{background:#53243d;border:1px solid #f4a8c4;padding:10px}
 .card-detail img{width:100%;max-height:330px;object-fit:contain;background:#1c1737;margin-bottom:12px}

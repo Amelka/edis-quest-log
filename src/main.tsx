@@ -31,7 +31,9 @@ function dateRange(today: string, selected: string) {
   return days
 }
 
-function Dialog({ title, children, close }: { title: string; children: ReactNode; close: () => void }) {
+function Dialog({ title, children, close, action }: {
+  title: string; children: ReactNode; close: () => void; action?: ReactNode
+}) {
   const ref = useRef<HTMLDialogElement>(null)
   useEffect(() => {
     const element = ref.current
@@ -39,7 +41,13 @@ function Dialog({ title, children, close }: { title: string; children: ReactNode
     return () => element?.close()
   }, [])
   return <dialog ref={ref} aria-labelledby="dialog-title" onCancel={event => { event.preventDefault(); close() }}>
-    <div className="dialog-head"><h2 id="dialog-title">{title}</h2><button className="icon" aria-label="Zamknij" onClick={close}>×</button></div>
+    <div className="dialog-head">
+      <h2 id="dialog-title">{title}</h2>
+      <div className="dialog-actions">
+        {action}
+        <button className="icon" aria-label="Zamknij" autoFocus onClick={close}>×</button>
+      </div>
+    </div>
     {children}
   </dialog>
 }
@@ -325,7 +333,7 @@ function App() {
         <section id="quests" className="panel quests" aria-labelledby="quests-heading">
           <div className="split quest-heading"><div><div className="eyebrow">02 / ZADANIA · {formatDate.format(dateOf(selected))}</div>
             <h2 id="quests-heading">{selected === today ? 'Questy na dziś' : 'Questy tego dnia'}</h2></div>
-            <button className="primary" disabled={!loaded} onClick={() => setModal({ kind: 'add' })}>＋ Dodaj wpis</button></div>
+            <button className="primary" disabled={!loaded} onClick={() => setModal({ kind: 'add' })}>+ Dodaj</button></div>
           {running && !quests.some(quest => questKey(quest, selected) === running.questKey) && <p className="album-note">Timer działa w innym queście. <button onClick={() => {
             const [id, day] = running.questKey.split('/')
             const quest = log.quests.find(item => item.id === id)
@@ -356,7 +364,9 @@ function App() {
       </section>
     </main>
     {modal && <Dialog key={modal.kind} title={modal.kind === 'add' ? 'Dodaj do planu' : modal.kind === 'edit' ? 'Edytuj quest' : modal.kind === 'quest' ? modalQuest?.piece ?? 'Quest' :
-      modal.kind === 'event' ? currentEvent?.title ?? 'Występ' : modal.kind === 'card' ? modal.card.name : 'Historia praktyki'} close={() => { setModal(null); setError('') }}>
+      modal.kind === 'event' ? currentEvent?.title ?? 'Występ' : modal.kind === 'card' ? modal.card.name : 'Historia praktyki'}
+      close={() => { setModal(null); setError('') }}
+      action={currentQuest && <button onClick={() => setModal({ kind: 'edit', id: currentQuest.quest.id, day: currentQuest.day })}>Edytuj</button>}>
       {error && <p className="error" role="alert">{error}</p>}
       {modal.kind === 'add' && <EntryForm day={selected} suggestions={suggestions} save={entry => void update(state => {
         if ('piece' in entry) state.quests.push(entry)
@@ -391,9 +401,6 @@ function App() {
           </button>}
           {remaining === 0 && <button className="primary" onClick={() => completeQuest(currentQuest.quest, currentQuest.day)}>✓ Oznacz quest jako ukończony</button>}
         </>}
-        <div className="quest-actions">
-          <button onClick={() => setModal({ kind: 'edit', id: currentQuest.quest.id, day: currentQuest.day })}>Edytuj</button>
-        </div>
       </>}
       {currentEvent && <EventDetails key={currentEvent.id} event={currentEvent} today={today} done={currentEvent.id in log.completed}
         save={(rating, comment) => void update(state => {
