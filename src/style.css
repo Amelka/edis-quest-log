@@ -27,6 +27,7 @@ h3{font-size:1.35rem}
 .primary:active:not(:disabled){transform:translateY(2px);box-shadow:0 1px #337a68}
 .notice{margin:12px 0;color:var(--accent);font-size:.88rem}
 .notice:empty{height:0;margin:0 0 18px}
+.dashboard{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));align-items:start;gap:18px;margin-bottom:32px}
 .main-column{display:grid;grid-template-columns:minmax(0,1fr);gap:18px;min-width:0}
 .panel{background:var(--panel);padding:clamp(15px,2.2vw,25px)}
 .split{display:flex;justify-content:space-between;align-items:center;gap:10px}
@@ -67,8 +68,7 @@ progress::-webkit-progress-value{background:var(--accent)}
 progress::-moz-progress-bar{background:var(--accent)}
 .piece{margin:12px 0;overflow-wrap:anywhere}
 .history{margin-top:12px;width:100%;text-align:left;font-size:.8rem}
-.album{margin:18px 0 32px}
-.album-layout{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin-top:14px}
+.album-layout{display:grid;gap:16px;margin-top:14px}
 .album-row{padding:14px;background:#1c1737;border:1px solid #5e507e}
 .album-row.special{border-color:#8a63a9}
 .album-row.special h3,.special .eyebrow{color:var(--special)}
@@ -106,5 +106,6 @@ fieldset{margin:0;border:1px solid var(--line)}
 .history-list li{border-bottom:1px solid #62537e;padding:6px 0}
 .history-list p{white-space:pre-wrap;overflow-wrap:anywhere}
 @media(pointer:fine){body{cursor:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32'%3E%3Cpath d='M3 2v25l7-6 5 9 5-3-5-9h10z' fill='%23bd77ff' stroke='white' stroke-width='2'/%3E%3C/svg%3E") 3 2,auto}}
-@media(max-width:620px){.profile,.album-layout{grid-template-columns:1fr}}
+@media(max-width:700px){.dashboard{grid-template-columns:1fr}}
+@media(max-width:620px){.profile{grid-template-columns:1fr}}
 @media(max-width:440px){.wrap{width:calc(100% - 24px)}.top-label{display:none}.quest-heading .primary{font-size:.75rem}.album-row{padding:10px}.card-grid{gap:4px}.card-slot{font-size:.55rem}.calendar-controls button{min-width:34px;padding:.4rem}}

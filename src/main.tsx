@@ -313,55 +313,57 @@ function App() {
       </section>
       {error && !modal && <div className="error" role="alert">{error} {!loaded && <button onClick={() => void load()}>Spróbuj ponownie</button>}</div>}
       <p className="notice" role="status">{notice}</p>
-      <div className="main-column">
-        <section className="panel calendar" aria-labelledby="calendar-heading">
-          <div className="split"><div><div className="eyebrow">01 / PLAN</div><h2 id="calendar-heading">Kalendarz</h2></div>
-            <div className="calendar-controls"><button onClick={() => {
-              const earlier = dateOf(timeline[0]); earlier.setDate(earlier.getDate() - 7); setSelected(dayKey(earlier))
-              axis.current?.scrollTo({ left: 0 })
-            }} aria-label="Pokaż wcześniejszy tydzień">‹</button><button onClick={chooseToday}>Dziś</button><button onClick={() => axis.current?.scrollBy({ left: 290 })} aria-label="Przewiń kalendarz w prawo">›</button></div>
+      <div className="dashboard">
+        <div className="main-column">
+          <section className="panel calendar" aria-labelledby="calendar-heading">
+            <div className="split"><div><div className="eyebrow">01 / PLAN</div><h2 id="calendar-heading">Kalendarz</h2></div>
+              <div className="calendar-controls"><button onClick={() => {
+                const earlier = dateOf(timeline[0]); earlier.setDate(earlier.getDate() - 7); setSelected(dayKey(earlier))
+                axis.current?.scrollTo({ left: 0 })
+              }} aria-label="Pokaż wcześniejszy tydzień">‹</button><button onClick={chooseToday}>Dziś</button><button onClick={() => axis.current?.scrollBy({ left: 290 })} aria-label="Przewiń kalendarz w prawo">›</button></div>
+            </div>
+            <div className="axis" ref={axis}>{timeline.map(day => {
+              const date = dateOf(day)
+              const special = log.performances.some(event => event.day === day)
+              return <button key={day} aria-current={day === today ? 'date' : undefined} aria-pressed={day === selected}
+                aria-label={fullDate.format(date) + (special ? ', występ' : '')}
+                className={['day', day < today && 'past', [0, 6].includes(date.getDay()) && 'weekend', day === today && 'today', special && 'performance-day'].filter(Boolean).join(' ')}
+                onClick={() => setSelected(day)}><small>{weekdayNames[date.getDay()]}</small><strong>{date.getDate()}</strong>{special && <i>◆</i>}</button>
+            })}</div>
+          </section>
+          <section id="quests" className="panel quests" aria-labelledby="quests-heading">
+            <div className="split quest-heading"><div><div className="eyebrow">02 / ZADANIA · {formatDate.format(dateOf(selected))}</div>
+              <h2 id="quests-heading">{selected === today ? 'Questy na dziś' : 'Questy tego dnia'}</h2></div>
+              <button className="primary" disabled={!loaded} onClick={() => setModal({ kind: 'add' })}>+ Dodaj</button></div>
+            {running && !quests.some(quest => questKey(quest, selected) === running.questKey) && <p className="album-note">Timer działa w innym queście. <button onClick={() => {
+              const [id, day] = running.questKey.split('/')
+              const quest = log.quests.find(item => item.id === id)
+              if (quest) setModal({ kind: 'quest', id: quest.id, day })
+            }}>Otwórz timer</button></p>}
+            {!quests.length && !events.length && <div className="empty"><span aria-hidden="true">♫</span><h3>{loaded ? 'Plan jest pusty' : 'Wczytuję dziennik…'}</h3><p>{loaded ? 'Dodaj quest lub występ, żeby zaplanować kolejny krok.' : 'Za chwilę pokażę twój plan.'}</p></div>}
+            {quests.length > 0 && <p className="album-note">{completed} / {quests.length} ukończonych{completed === quests.length && ' · ✓ Plan dnia ukończony'}</p>}
+            {quests.map(quest => {
+              const key = questKey(quest, selected)
+              const done = key in log.completed
+              return <button className="entry" key={key} onClick={() => setModal({ kind: 'quest', id: quest.id, day: selected })}>
+                <span className={'entry-icon ' + (done ? 'done' : '')}>{done ? '✓' : '♫'}</span>
+                <span><strong>{quest.piece}</strong><small>{quest.minutes} min{done ? ' · Ukończony' : running?.questKey === key ? ' · Trwa ćwiczenie' : ''}</small></span>
+                <b>+{done ? log.completed[key] : quest.xp} XP</b>
+              </button>
+            })}
+            {events.map(event => <button className="entry event" key={event.id} onClick={() => setModal({ kind: 'event', id: event.id })}>
+              <span className="entry-icon">◆</span><span><strong>{event.title}</strong><small>{event.id in log.completed ? 'Ukończony występ' : 'Występ · karta specjalna'}</small></span><b>+{event.xp} XP</b>
+            </button>)}
+          </section>
+        </div>
+        <section className="panel album" id="album" aria-labelledby="album-heading">
+          <div className="eyebrow">03 / KOLEKCJA</div><h2 id="album-heading">Album kart</h2>
+          <div className="album-layout">
+            <AlbumRow cards={regularCards} log={log} available={earned} special={false} open={(card, special) => setModal({ kind: 'card', card, special })} reveal={reveal} />
+            <AlbumRow cards={specialCards} log={log} available={specials} special open={(card, special) => setModal({ kind: 'card', card, special })} reveal={reveal} />
           </div>
-          <div className="axis" ref={axis}>{timeline.map(day => {
-            const date = dateOf(day)
-            const special = log.performances.some(event => event.day === day)
-            return <button key={day} aria-current={day === today ? 'date' : undefined} aria-pressed={day === selected}
-              aria-label={fullDate.format(date) + (special ? ', występ' : '')}
-              className={['day', day < today && 'past', [0, 6].includes(date.getDay()) && 'weekend', day === today && 'today', special && 'performance-day'].filter(Boolean).join(' ')}
-              onClick={() => setSelected(day)}><small>{weekdayNames[date.getDay()]}</small><strong>{date.getDate()}</strong>{special && <i>◆</i>}</button>
-          })}</div>
-        </section>
-        <section id="quests" className="panel quests" aria-labelledby="quests-heading">
-          <div className="split quest-heading"><div><div className="eyebrow">02 / ZADANIA · {formatDate.format(dateOf(selected))}</div>
-            <h2 id="quests-heading">{selected === today ? 'Questy na dziś' : 'Questy tego dnia'}</h2></div>
-            <button className="primary" disabled={!loaded} onClick={() => setModal({ kind: 'add' })}>+ Dodaj</button></div>
-          {running && !quests.some(quest => questKey(quest, selected) === running.questKey) && <p className="album-note">Timer działa w innym queście. <button onClick={() => {
-            const [id, day] = running.questKey.split('/')
-            const quest = log.quests.find(item => item.id === id)
-            if (quest) setModal({ kind: 'quest', id: quest.id, day })
-          }}>Otwórz timer</button></p>}
-          {!quests.length && !events.length && <div className="empty"><span aria-hidden="true">♫</span><h3>{loaded ? 'Plan jest pusty' : 'Wczytuję dziennik…'}</h3><p>{loaded ? 'Dodaj quest lub występ, żeby zaplanować kolejny krok.' : 'Za chwilę pokażę twój plan.'}</p></div>}
-          {quests.length > 0 && <p className="album-note">{completed} / {quests.length} ukończonych{completed === quests.length && ' · ✓ Plan dnia ukończony'}</p>}
-          {quests.map(quest => {
-            const key = questKey(quest, selected)
-            const done = key in log.completed
-            return <button className="entry" key={key} onClick={() => setModal({ kind: 'quest', id: quest.id, day: selected })}>
-              <span className={'entry-icon ' + (done ? 'done' : '')}>{done ? '✓' : '♫'}</span>
-              <span><strong>{quest.piece}</strong><small>{quest.minutes} min{done ? ' · Ukończony' : running?.questKey === key ? ' · Trwa ćwiczenie' : ''}</small></span>
-              <b>+{done ? log.completed[key] : quest.xp} XP</b>
-            </button>
-          })}
-          {events.map(event => <button className="entry event" key={event.id} onClick={() => setModal({ kind: 'event', id: event.id })}>
-            <span className="entry-icon">◆</span><span><strong>{event.title}</strong><small>{event.id in log.completed ? 'Ukończony występ' : 'Występ · karta specjalna'}</small></span><b>+{event.xp} XP</b>
-          </button>)}
         </section>
       </div>
-      <section className="panel album" id="album" aria-labelledby="album-heading">
-        <div className="eyebrow">03 / KOLEKCJA</div><h2 id="album-heading">Album kart</h2>
-        <div className="album-layout">
-          <AlbumRow cards={regularCards} log={log} available={earned} special={false} open={(card, special) => setModal({ kind: 'card', card, special })} reveal={reveal} />
-          <AlbumRow cards={specialCards} log={log} available={specials} special open={(card, special) => setModal({ kind: 'card', card, special })} reveal={reveal} />
-        </div>
-      </section>
     </main>
     {modal && <Dialog key={modal.kind} title={modal.kind === 'add' ? 'Dodaj do planu' : modal.kind === 'edit' ? 'Edytuj quest' : modal.kind === 'quest' ? modalQuest?.piece ?? 'Quest' :
       modal.kind === 'event' ? currentEvent?.title ?? 'Występ' : modal.kind === 'card' ? modal.card.name : 'Historia praktyki'}
