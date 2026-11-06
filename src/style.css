@@ -1,6 +1,6 @@
 @font-face{font-family:'Bitcount Prop Single';src:url('/art/bitcount-prop-single.ttf') format('truetype');font-weight:400;font-display:swap}
 @font-face{font-family:Lexend;src:url('/art/lexend.ttf') format('truetype');font-weight:100 900;font-display:swap}
-:root{color-scheme:dark;--bg:#14112a;--panel:#242048;--ink:#f6f2ff;--muted:#c6bcd9;--accent:#68f2d0;--special:#d6a5ff;--today:#90c9ff;--line:#706298;--heading:'Bitcount Prop Single',monospace;font-family:Lexend,sans-serif;color:var(--ink);background:var(--bg);font-weight:400}
+:root{color-scheme:dark;--bg:#14112a;--panel:#242048;--ink:#f6f2ff;--muted:#c6bcd9;--accent:#68f2d0;--action-hover:#5ce68b;--special:#d6a5ff;--today:#90c9ff;--line:#706298;--heading:'Bitcount Prop Single',monospace;font-family:Lexend,sans-serif;color:var(--ink);background:var(--bg);font-weight:400}
 *{box-sizing:border-box}
 body{margin:0;background-image:linear-gradient(#d6a5ff0c 1px,transparent 1px),linear-gradient(90deg,#d6a5ff0c 1px,transparent 1px);background-size:24px 24px;min-height:100vh}
 button,input,select,textarea{font:inherit}
@@ -41,11 +41,14 @@ h3{font-size:1.35rem}
 .day.weekend{border-style:solid}
 .day.today{background:var(--today);color:var(--bg);border-color:#c7e6ff}
 .day.performance-day{border:2px solid #ff8dc8}
-.day.today:hover{background:#b8dfff}
+.day:hover:not(:disabled){background:#26734e;color:#f0d0ff}
 .day[aria-pressed=true]{box-shadow:0 0 0 2px var(--accent)}
-.day i{font-style:normal;color:#ffabd8;position:absolute;right:4px;top:2px;font-size:.66rem}
-.day.today i{color:#53277c}
+.gem-icon{display:block;width:20px;height:20px}
+.day .gem-icon{color:#ffabd8;position:absolute;right:3px;top:3px;width:12px;height:12px}
+.day.today .gem-icon{color:#663799}
+.day:hover .gem-icon{color:#f0d0ff}
 .quest-heading{margin-bottom:14px}
+.quest-heading .primary:hover:not(:disabled){background:var(--action-hover);border-color:#a4f6b9;box-shadow:0 3px #31834e}
 .empty{text-align:center;padding:24px 12px 22px;border:1px dashed #7969a1;background:#201a3c}
 .empty>span{display:grid;place-items:center;width:42px;height:42px;margin:0 auto 10px;background:#382d61;color:var(--accent);font-size:1.4rem}
 .empty p{color:var(--muted);font-size:.85rem;margin:.5rem 0 0}
@@ -57,8 +60,9 @@ h3{font-size:1.35rem}
 .entry-icon.done{background:var(--accent);color:var(--bg)}
 .entry.event b,.entry.event .entry-icon{color:var(--special)}
 .profile{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:clamp(18px,4vw,56px);margin-top:18px}
-.profile-title{display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center;margin-bottom:20px}
-.avatar{display:block;width:51px;height:51px;object-fit:cover;background:var(--bg);border:3px solid #cae7ff}
+.profile-player{display:grid;grid-template-columns:auto minmax(0,1fr);gap:clamp(10px,2vw,20px);align-items:center}
+.profile-title{flex-wrap:wrap;margin-bottom:10px}
+.avatar{display:block;width:clamp(72px,24vw,120px);aspect-ratio:1;object-fit:cover;background:var(--bg);border:3px solid #cae7ff}
 .xp{color:var(--accent);font-family:var(--heading);font-weight:400;font-size:1.4rem}
 .profile .split{font-size:.78rem}
 .profile .split b{white-space:nowrap;color:var(--accent)}

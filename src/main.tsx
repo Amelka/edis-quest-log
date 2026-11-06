@@ -31,6 +31,15 @@ function dateRange(today: string, selected: string) {
   return days
 }
 
+function Gem() {
+  return <svg className="gem-icon" viewBox="0 0 24 24" aria-hidden="true">
+    <path d="M6 4h12l5 6-11 11L1 10Z" fill="currentColor" />
+    <path d="m6 4 2 6H1Zm12 0 5 6h-7Z" fill="#fff" opacity=".35" />
+    <path d="m8 10 4 11 4-11Z" fill="#14112a" opacity=".35" />
+    <path d="M1 10h22M8 10l4-6 4 6" fill="none" stroke="#14112a" opacity=".6" />
+  </svg>
+}
+
 function Dialog({ title, children, close, action, cardMode }: {
   title: string; children: ReactNode; close: () => void; action?: ReactNode; cardMode?: 'preview' | 'discovery'
 }) {
@@ -296,11 +305,17 @@ function App() {
     <header className="top"><div className="wrap top-inner"><a className="brand" href="#main"><span>♫</span> Edi’s Quest Log</a><span className="top-label">GILDIA MUZYCZNA</span></div></header>
     <main className="wrap" id="main">
       <section className="panel profile" aria-labelledby="profile-heading">
-        <div>
-          <div className="profile-title"><img className="avatar" src="/art/edi-avatar-v2.png" alt="" /><div><div className="eyebrow">GRACZ</div><h2 id="profile-heading">Edi</h2></div><strong className="xp">{xp} XP</strong></div>
-          <div className="split"><span>Do następnej karty</span><b>{xp % 100} / 100 XP</b></div>
-          <progress max={100} value={xp % 100} aria-label="Postęp do następnej karty" />
-          {earned > 0 && <a className="reward-link" href="#album">✧ Czekające odkrycia: {earned}</a>}
+        <div className="profile-player">
+          <img className="avatar" src="/art/edi-avatar-v2.png" alt="" />
+          <div>
+            <div className="split profile-title">
+              <div><div className="eyebrow">GRACZ</div><h2 id="profile-heading">Edi</h2></div>
+              <strong className="xp">{xp} XP</strong>
+            </div>
+            <div className="split"><span>Do następnej karty</span><b>{xp % 100} / 100 XP</b></div>
+            <progress max={100} value={xp % 100} aria-label="Postęp do następnej karty" />
+            {earned > 0 && <a className="reward-link" href="#album">✧ Czekające odkrycia: {earned}</a>}
+          </div>
         </div>
         <div><h3>Twoja praktyka</h3><p className="album-note">Dzisiaj: <strong>{minutes(days.get(today) ?? 0)} min</strong></p>
           {pieces.size === 0 && <p className="album-note">Tu pojawi się czas ćwiczeń dla każdego utworu.</p>}
@@ -328,7 +343,7 @@ function App() {
               return <button key={day} aria-current={day === today ? 'date' : undefined} aria-pressed={day === selected}
                 aria-label={fullDate.format(date) + (special ? ', występ' : '')}
                 className={['day', day < today && 'past', [0, 6].includes(date.getDay()) && 'weekend', day === today && 'today', special && 'performance-day'].filter(Boolean).join(' ')}
-                onClick={() => setSelected(day)}><small>{weekdayNames[date.getDay()]}</small><strong>{date.getDate()}</strong>{special && <i>◆</i>}</button>
+                onClick={() => setSelected(day)}><small>{weekdayNames[date.getDay()]}</small><strong>{date.getDate()}</strong>{special && <Gem />}</button>
             })}</div>
           </section>
           <section id="quests" className="panel quests" aria-labelledby="quests-heading">
@@ -352,7 +367,7 @@ function App() {
               </button>
             })}
             {events.map(event => <button className="entry event" key={event.id} onClick={() => setModal({ kind: 'event', id: event.id })}>
-              <span className="entry-icon">◆</span><span><strong>{event.title}</strong><small>{event.id in log.completed ? 'Ukończony występ' : 'Występ · karta specjalna'}</small></span><b>+{event.xp} XP</b>
+              <span className="entry-icon"><Gem /></span><span><strong>{event.title}</strong><small>{event.id in log.completed ? 'Ukończony występ' : 'Występ · karta specjalna'}</small></span><b>+{event.xp} XP</b>
             </button>)}
           </section>
         </div>
