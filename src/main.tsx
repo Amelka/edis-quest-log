@@ -8,7 +8,7 @@ import type { Log, Performance, Quest } from './log'
 import './style.css'
 
 type Modal = { kind: 'add' } | { kind: 'quest' | 'edit'; id: string; day: string } |
-  { kind: 'event'; id: string } | { kind: 'card'; card: Card; special: boolean } | { kind: 'history' }
+  { kind: 'event'; id: string } | { kind: 'card'; card: Card; special: boolean; discovering?: boolean } | { kind: 'history' }
 
 const weekdayNames = ['Nd', 'Pn', 'Wt', 'Śr', 'Cz', 'Pt', 'So']
 const formatDate = new Intl.DateTimeFormat('pl', { day: 'numeric', month: 'long' })
@@ -31,8 +31,8 @@ function dateRange(today: string, selected: string) {
   return days
 }
 
-function Dialog({ title, children, close, action }: {
-  title: string; children: ReactNode; close: () => void; action?: ReactNode
+function Dialog({ title, children, close, action, cardMode }: {
+  title: string; children: ReactNode; close: () => void; action?: ReactNode; cardMode?: 'preview' | 'discovery'
 }) {
   const ref = useRef<HTMLDialogElement>(null)
   useEffect(() => {
@@ -40,9 +40,9 @@ function Dialog({ title, children, close, action }: {
     element?.showModal()
     return () => element?.close()
   }, [])
-  return <dialog ref={ref} aria-labelledby="dialog-title" onCancel={event => { event.preventDefault(); close() }}>
+  return <dialog className={cardMode ? 'card-dialog ' + cardMode : undefined} ref={ref} aria-labelledby="dialog-title" onCancel={event => { event.preventDefault(); close() }}>
     <div className="dialog-head">
-      <h2 id="dialog-title">{title}</h2>
+      {!cardMode && <h2 id="dialog-title">{title}</h2>}
       <div className="dialog-actions">
         {action}
         <button className="icon" aria-label="Zamknij" autoFocus onClick={close}>×</button>
@@ -137,8 +137,8 @@ function AlbumRow({ cards, log, available, special, open, reveal }: {
       return unlocked ? <button className="card-slot unlocked" key={card.id} onClick={() => open(card, special)}>
         <img src={cardUrl(card)} alt="" /><span>{card.name}</span>
       </button> : card === next && available > 0 ?
-        <button className="card-slot ready" key={card.id} aria-label="Odkryj kartę" onClick={() => reveal(special)}><b>✧</b><span>Odkryj</span></button> :
-        <div className="card-slot locked" key={card.id} aria-label={'Zakryta karta ' + (index + 1)}><b>◇</b><span>{String(index + 1).padStart(2, '0')}</span></div>
+        <button className="card-slot card-back ready" key={card.id} aria-label="Odkryj kartę" onClick={() => reveal(special)}><b aria-hidden="true">✦</b><span>Odkryj</span></button> :
+        <div className="card-slot card-back locked" key={card.id} aria-label={'Zakryta karta ' + (index + 1)}><b aria-hidden="true">{special ? '✦' : '♫'}</b><span>{String(index + 1).padStart(2, '0')}</span></div>
     })}</div>
     {!next ? <p className="album-note">Kolekcja ukończona — {count}/{cards.length}.{available > 0 && ' Czekające odkrycia: ' + available + '.'}</p> :
       <p className="album-note">{available > 0 ? 'Czekające odkrycia: ' + available : special ? 'Ukończ występ, żeby zdobyć kartę specjalną.' : 'Co 100 XP możesz odkryć nową kartę.'}</p>}
@@ -250,7 +250,7 @@ function App() {
       if (credits <= count) return
       card = deck.find(entry => !state.revealed.includes(entry.id))
       if (card) state.revealed.push(card.id)
-    }, () => { if (card) setModal({ kind: 'card', card, special }) })
+    }, () => { if (card) setModal({ kind: 'card', card, special, discovering: true }) })
   }
 
   function toggleTimer(quest: Quest, day: string) {
@@ -297,7 +297,7 @@ function App() {
     <main className="wrap" id="main">
       <section className="panel profile" aria-labelledby="profile-heading">
         <div>
-          <div className="profile-title"><div className="avatar" aria-hidden="true">E</div><div><div className="eyebrow">GRACZ</div><h2 id="profile-heading">Edi</h2></div><strong className="xp">{xp} XP</strong></div>
+          <div className="profile-title"><img className="avatar" src="/art/edi-avatar-v2.png" alt="" /><div><div className="eyebrow">GRACZ</div><h2 id="profile-heading">Edi</h2></div><strong className="xp">{xp} XP</strong></div>
           <div className="split"><span>Do następnej karty</span><b>{xp % 100} / 100 XP</b></div>
           <progress max={100} value={xp % 100} aria-label="Postęp do następnej karty" />
           {earned > 0 && <a className="reward-link" href="#album">✧ Czekające odkrycia: {earned}</a>}
@@ -368,6 +368,7 @@ function App() {
     {modal && <Dialog key={modal.kind} title={modal.kind === 'add' ? 'Dodaj do planu' : modal.kind === 'edit' ? 'Edytuj quest' : modal.kind === 'quest' ? modalQuest?.piece ?? 'Quest' :
       modal.kind === 'event' ? currentEvent?.title ?? 'Występ' : modal.kind === 'card' ? modal.card.name : 'Historia praktyki'}
       close={() => { setModal(null); setError('') }}
+      cardMode={modal.kind === 'card' ? modal.discovering ? 'discovery' : 'preview' : undefined}
       action={currentQuest && <button onClick={() => setModal({ kind: 'edit', id: currentQuest.quest.id, day: currentQuest.day })}>Edytuj</button>}>
       {error && <p className="error" role="alert">{error}</p>}
       {modal.kind === 'add' && <EntryForm day={selected} suggestions={suggestions} save={entry => void update(state => {
@@ -412,9 +413,19 @@ function App() {
         complete={() => void update(state => {
           if (currentEvent.day <= dayKey() && !(currentEvent.id in state.completed)) state.completed[currentEvent.id] = currentEvent.xp
         }, () => setNotice('✓ Występ ukończony. Karta specjalna czeka w albumie.'))} />}
-      {modal.kind === 'card' && <div className={'card-detail ' + (modal.special ? 'special' : '')}>
-        <img src={cardUrl(modal.card)} alt={'Ilustracja karty ' + modal.card.name} /><p className="eyebrow">{modal.card.detail}</p>
-        <p>{modal.card.description}</p><a className="reward-link" href={'https://pl.wikipedia.org/wiki/' + encodeURIComponent(modal.card.wiki)} target="_blank" rel="noreferrer">Czytaj w Wikipedii ↗</a>
+      {modal.kind === 'card' && <div className={'card-presentation' + (modal.special ? ' special' : '')}>
+        {modal.discovering && <div className="card-back reveal-back" aria-hidden="true">
+          <b>{modal.special ? '✦' : '♫'}</b>
+        </div>}
+        <article className="card-detail">
+          <h2 id="dialog-title">{modal.card.name}</h2>
+          <div className="card-art">
+            <img src={cardUrl(modal.card)} alt={'Ilustracja karty ' + modal.card.name} />
+          </div>
+          <p className="eyebrow">{modal.card.detail}</p>
+          <p>{modal.card.description}</p>
+          <a className="reward-link" href={'https://pl.wikipedia.org/wiki/' + encodeURIComponent(modal.card.wiki)} target="_blank" rel="noreferrer">Czytaj w Wikipedii ↗</a>
+        </article>
       </div>}
       {modal.kind === 'history' && <>
         <h3>Ćwiczenia według dni</h3>
