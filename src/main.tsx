@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
-import type { FormEvent, ReactNode } from 'react'
+import type { CSSProperties, FormEvent, ReactNode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { regularCards, specialCards } from './cards'
 import type { Card } from './cards'
-import { accessLog, dateOf, dayKey, elapsed, emptyLog, moveQuest, occurs, practiceTotals, questKey, questsForDay, settleTimer, specialEarned, totalXP } from './log'
-import type { Log, Performance, Quest } from './log'
+import { accessLog, colorForPiece, dateOf, dayKey, elapsed, emptyLog, moveQuest, occurs, pieceColorKey, pieceColorOptions, piecePalette, practiceTotals, questKey, questsForDay, setPieceColor, settleTimer, specialEarned, totalXP } from './log'
+import type { Log, Performance, PieceColor, Quest } from './log'
 import './style.css'
 
 type Modal = { kind: 'add' } | { kind: 'quest' | 'edit'; id: string; day: string } |
@@ -61,10 +61,15 @@ function Dialog({ title, children, close, action, cardMode }: {
   </dialog>
 }
 
-function EntryForm({ day, quest, suggestions, save }: {
-  day: string; quest?: Quest; suggestions: string[]; save: (entry: Quest | Performance) => void
+function EntryForm({ day, quest, suggestions, colors, save }: {
+  day: string; quest?: Quest; suggestions: string[]; colors: Log['pieceColors'];
+  save: (entry: Quest | Performance, color?: PieceColor) => void
 }) {
   const [kind, setKind] = useState('quest')
+  const [pieceInput, setPieceInput] = useState(quest?.piece ?? '')
+  const [colorOverride, setColorOverride] = useState<{ key: string; color: PieceColor }>()
+  const pieceKey = pieceColorKey(pieceInput)
+  const chosenColor = colorOverride?.key === pieceKey ? colorOverride.color : colorForPiece(colors, pieceInput)
   const [repeat, setRepeat] = useState(quest ? quest.weekdays.length === 7 ? 'daily' : quest.start === quest.end ? 'once' : 'weekly' : 'daily')
   const [start, setStart] = useState(quest?.start ?? day)
   const defaultEnd = dateOf(day)
@@ -93,7 +98,8 @@ function EntryForm({ day, quest, suggestions, save }: {
       setError('Wybierz przynajmniej jeden dzień, który wypada w podanym zakresie.')
       return
     }
-    save({ ...common, start, end, weekdays, title, piece, minutes: Number(value('minutes')), tips: value('tips') })
+    save({ ...common, start, end, weekdays, title, piece, minutes: Number(value('minutes')), tips: value('tips') },
+      colorOverride?.key === pieceColorKey(piece) ? colorOverride.color : undefined)
   }
   return <form onSubmit={submit}>
     {!quest && <label>Rodzaj wpisu<select value={kind} onChange={event => { setKind(event.target.value); setError('') }}>
@@ -102,7 +108,15 @@ function EntryForm({ day, quest, suggestions, save }: {
     <label>Nazwa<input key={kind} name="title" defaultValue={quest?.title} required={kind === 'event'} maxLength={100}
       placeholder={kind === 'quest' ? 'Opcjonalnie, np. Lewa ręka' : 'Koncert zimowy'} /></label>
     {kind === 'quest' && <>
-      <label>Utwór<input name="piece" list="known-pieces" defaultValue={quest?.piece} required maxLength={100} placeholder="Nokturn Es-dur" /></label>
+      <label>Utwór<input name="piece" list="known-pieces" value={pieceInput} onChange={event => setPieceInput(event.target.value)} required maxLength={100} placeholder="Nokturn Es-dur" /></label>
+      <label>Kolor utworu
+        <span className="piece-color-picker">
+          <span className="piece-color-swatch" style={{ backgroundColor: piecePalette[chosenColor].hex }} aria-hidden="true" />
+          <select value={chosenColor} onChange={event => setColorOverride({ key: pieceKey, color: event.target.value as PieceColor })}>
+            {pieceColorOptions.map(color => <option key={color} value={color}>{piecePalette[color].name}</option>)}
+          </select>
+        </span>
+      </label>
       <datalist id="known-pieces">{suggestions.map(piece => <option key={piece} value={piece} />)}</datalist>
     </>}
     <div className="form-row">
@@ -231,6 +245,9 @@ function App() {
   }
 
   const { pieces, days } = practiceTotals(log, now)
+  const pieceStyle = (piece: string) => ({
+    '--piece-color': piecePalette[colorForPiece(log.pieceColors, piece)].hex,
+  } as CSSProperties)
   const xp = totalXP(log)
   const earned = Math.floor(xp / 100) - regularCards.filter(card => log.revealed.includes(card.id)).length
   const specials = specialEarned(log) - specialCards.filter(card => log.revealed.includes(card.id)).length
@@ -335,7 +352,7 @@ function App() {
         </div>
         <div><h3>Twoja praktyka</h3><p className="album-note">Dzisiaj: <strong>{minutes(days.get(today) ?? 0)} min</strong></p>
           {pieces.size === 0 && <p className="album-note">Tu pojawi się czas ćwiczeń dla każdego utworu.</p>}
-          {[...pieces].sort((a, b) => b[1] - a[1]).map(([piece, duration]) => <div className="piece" key={piece}>
+          {[...pieces].sort((a, b) => b[1] - a[1]).map(([piece, duration]) => <div className="piece" key={piece} style={pieceStyle(piece)}>
             <div className="split"><span>{piece}</span><b>{minutes(duration)} min</b></div>
             <progress max={Math.max(...pieces.values())} value={duration} aria-label={'Czas ćwiczeń: ' + piece} />
           </div>)}
@@ -365,7 +382,7 @@ function App() {
           <section id="quests" className="panel quests" aria-labelledby="quests-heading">
             <div className="split quest-heading"><div><div className="eyebrow">02 / ZADANIA · {formatDate.format(dateOf(selected))}</div>
               <h2 id="quests-heading">{selected === today ? 'Questy na dziś' : 'Questy tego dnia'}</h2></div>
-              <button className="primary" disabled={!loaded} onClick={() => setModal({ kind: 'add' })}>+ Dodaj</button></div>
+              <button className="secondary" disabled={!loaded} onClick={() => setModal({ kind: 'add' })}>+ Dodaj</button></div>
             {running && !quests.some(quest => questKey(quest, selected) === running.questKey) && <p className="album-note">Timer działa w innym queście. <button onClick={() => {
               const [id, day] = running.questKey.split('/')
               const quest = log.quests.find(item => item.id === id)
@@ -383,7 +400,7 @@ function App() {
               const sourceIndex = quests.findIndex(item => item.id === activeDrag?.questId)
               const targetClass = isTarget ? (sourceIndex < index ? ' drop-after' : ' drop-before') : ''
 
-              return <div className={'quest-row' + targetClass} key={key}
+              return <div className={'quest-row' + targetClass} key={key} style={pieceStyle(quest.piece)}
                 onDragOver={event => {
                   if (!activeDrag || activeDrag.questId === quest.id) return
                   event.preventDefault()
@@ -436,17 +453,20 @@ function App() {
       cardMode={modal.kind === 'card' ? modal.discovering ? 'discovery' : 'preview' : undefined}
       action={currentQuest && <button onClick={() => setModal({ kind: 'edit', id: currentQuest.quest.id, day: currentQuest.day })}>Edytuj</button>}>
       {error && <p className="error" role="alert">{error}</p>}
-      {modal.kind === 'add' && <EntryForm day={selected} suggestions={suggestions} save={entry => void update(state => {
-        if ('piece' in entry) state.quests.push(entry)
-        else state.performances.push(entry)
+      {modal.kind === 'add' && <EntryForm day={selected} suggestions={suggestions} colors={log.pieceColors} save={(entry, color) => void update(state => {
+        if ('piece' in entry) {
+          state.quests.push(entry)
+          setPieceColor(state, entry.piece, color)
+        } else state.performances.push(entry)
       }, () => { setSelected('piece' in entry ? entry.start : entry.day); setModal(null); setNotice('✓ Wpis dodany do planu.') })} />}
-      {modal.kind === 'edit' && modalQuest && <EntryForm day={modal.day} quest={modalQuest} suggestions={suggestions} save={entry => void update(state => {
+      {modal.kind === 'edit' && modalQuest && <EntryForm day={modal.day} quest={modalQuest} suggestions={suggestions} colors={log.pieceColors} save={(entry, color) => void update(state => {
         const index = state.quests.findIndex(quest => quest.id === entry.id)
         if (index < 0 || !('piece' in entry)) return
         if (state.timer?.questKey.startsWith(entry.id + '/')) {
           throw new Error('Zatrzymaj timer tego questu przed zapisaniem zmian.')
         }
         state.quests[index] = entry
+        setPieceColor(state, entry.piece, color)
       }, () => {
         if ('piece' in entry && !occurs(entry, modal.day)) {
           const date = dateOf(entry.start)

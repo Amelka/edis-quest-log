@@ -33,6 +33,7 @@ type Timer = Omit<Session, 'end'> & { deadline: number }
 export type Log = {
   quests: Quest[]
   questOrder?: Record<string, string[]>
+  pieceColors?: Record<string, PieceColor>
   performances: Performance[]
   sessions: Session[]
   completed: Record<string, number>
@@ -42,6 +43,37 @@ export type Log = {
 
 export const emptyLog: Log = {
   quests: [], performances: [], sessions: [], completed: {}, revealed: [],
+}
+
+export const piecePalette = {
+  mint: { name: 'Miętowy', hex: '#68f2d0' },
+  blue: { name: 'Błękitny', hex: '#90c9ff' },
+  violet: { name: 'Fioletowy', hex: '#c7a5ff' },
+  pink: { name: 'Różowy', hex: '#ff9ecc' },
+  gold: { name: 'Złoty', hex: '#ffd284' },
+  orange: { name: 'Pomarańczowy', hex: '#ffad87' },
+  lime: { name: 'Limonkowy', hex: '#b9e97a' },
+}
+
+export type PieceColor = keyof typeof piecePalette
+export const pieceColorOptions = Object.keys(piecePalette) as PieceColor[]
+export const pieceColorKey = (piece: string) => piece.trim().normalize('NFC').toLocaleLowerCase('pl')
+
+export function colorForPiece(colors: Log['pieceColors'], piece: string): PieceColor {
+  const key = pieceColorKey(piece)
+  const saved = colors?.[key]
+  if (saved && Object.hasOwn(piecePalette, saved)) return saved
+
+  // Give older entries a consistent color before they have a saved preference.
+  let index = 0
+  for (const char of key) index = (index * 31 + char.codePointAt(0)!) % pieceColorOptions.length
+  return pieceColorOptions[index]
+}
+
+export function setPieceColor(log: Log, piece: string, color?: PieceColor) {
+  const key = pieceColorKey(piece)
+  if (!color && log.pieceColors && Object.hasOwn(log.pieceColors, key)) return
+  log.pieceColors = { ...log.pieceColors, [key]: color ?? colorForPiece(undefined, piece) }
 }
 
 export function dayKey(date = new Date()) {
