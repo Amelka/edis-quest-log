@@ -399,6 +399,9 @@ function App() {
               if (quest) setModal({ kind: 'quest', id: quest.id, day })
             }}>Otwórz timer</button></p>}
             {!quests.length && !events.length && <div className="empty"><span aria-hidden="true">♫</span><h3>{loaded ? 'Plan jest pusty' : 'Wczytuję dziennik…'}</h3><p>{loaded ? 'Dodaj quest lub występ, żeby zaplanować kolejny krok.' : 'Za chwilę pokażę twój plan.'}</p></div>}
+            {events.map(event => <button className="entry event" key={event.id} onClick={() => setModal({ kind: 'event', id: event.id })}>
+              <span className="entry-icon"><Gem /></span><span><strong>{event.title}</strong><small>{event.id in log.completed ? 'Ukończony występ' : 'Występ · karta specjalna'}</small></span><b>+{log.completed[event.id] ?? event.xp} XP</b>
+            </button>)}
             {quests.length > 0 && <p className="album-note">{completed} / {quests.length} ukończonych{completed === quests.length && ' · ✓ Plan dnia ukończony'}</p>}
             {quests.map((quest, index) => {
               const key = questKey(quest, selected)
@@ -443,9 +446,6 @@ function App() {
                   }} onDragEnd={() => setDrag(null)}>⠿</span>}
               </div>
             })}
-            {events.map(event => <button className="entry event" key={event.id} onClick={() => setModal({ kind: 'event', id: event.id })}>
-              <span className="entry-icon"><Gem /></span><span><strong>{event.title}</strong><small>{event.id in log.completed ? 'Ukończony występ' : 'Występ · karta specjalna'}</small></span><b>+{log.completed[event.id] ?? event.xp} XP</b>
-            </button>)}
           </section>
         </div>
         <section className="panel album" id="album" aria-labelledby="album-heading">
