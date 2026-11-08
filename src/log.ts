@@ -173,6 +173,16 @@ function openLog() {
   return database
 }
 
+function replaceRetiredCards(log: Log) {
+  if (log.revealed.includes('clara') || log.revealed.includes('debussy')) {
+    log.revealed = [...new Set(log.revealed.map(id => {
+      if (id === 'clara') return 'tekla'
+      if (id === 'debussy') return 'liszt'
+      return id
+    }))]
+  }
+}
+
 async function accessBrowserLog(change?: (log: Log) => void): Promise<Log | undefined> {
   const db = await openLog()
   return new Promise((resolve, reject) => {
@@ -183,6 +193,7 @@ async function accessBrowserLog(change?: (log: Log) => void): Promise<Log | unde
     let failure: unknown
     request.onsuccess = () => {
       log = request.result
+      if (log) replaceRetiredCards(log)
       if (!change) return
       log ??= structuredClone(emptyLog)
       try {
@@ -225,6 +236,7 @@ export async function accessLog(change?: (log: Log) => void): Promise<Log> {
 
   const snapshot = await readJournal()
   const log = snapshot.log ?? structuredClone(emptyLog)
+  replaceRetiredCards(log)
   if (!change) return log
 
   const now = Date.now()

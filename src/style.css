@@ -74,10 +74,10 @@ h3{font-size:1.35rem}
 .card-slot.ready{border:2px solid var(--accent);color:var(--accent)}
 .card-slot.ready b{color:inherit}
 .special .card-slot.ready{border-color:var(--special);color:var(--special)}
-.card-slot.unlocked{padding:0;border:1px solid var(--accent);overflow:hidden;align-content:stretch}
+.card-slot.unlocked{padding:0;border:1px solid var(--accent);overflow:hidden;grid-template-rows:minmax(0,1fr) auto;gap:0}
 .special .card-slot.unlocked{border-color:var(--special)}
-.unlocked img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
-.unlocked span{position:absolute;inset:auto 0 0;padding:4px 2px;background:#14112aeb;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.unlocked img{display:block;width:100%;height:100%;min-height:0;object-fit:contain;object-position:center}
+.unlocked span{width:100%;padding:4px 2px;background:#14112aeb;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .album-note{color:var(--muted);font-size:.8rem;margin:.6rem 0 0}
 .reward-link{display:inline-block;margin-top:8px;font-size:.85rem}
 dialog{width:min(540px,calc(100% - 30px));max-height:calc(100% - 36px);background:var(--panel);color:var(--ink);border:2px solid var(--line);padding:24px;overflow:auto}
@@ -202,6 +202,7 @@ fieldset{margin:0;border:1px solid var(--line)}
 
 .card-art {
   margin-top: 12px;
+  aspect-ratio: 1;
   border: 1px solid var(--card-inner);
   background: #14112a;
 }
@@ -209,8 +210,9 @@ fieldset{margin:0;border:1px solid var(--line)}
 .card-art img {
   display: block;
   width: 100%;
-  height: clamp(150px, 32vh, 280px);
+  height: 100%;
   object-fit: cover;
+  object-position: center;
 }
 
 .preview .card-presentation {
