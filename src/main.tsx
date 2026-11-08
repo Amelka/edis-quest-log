@@ -5,10 +5,11 @@ import { regularCards, specialCards } from './cards'
 import type { Card } from './cards'
 import { accessLog, colorForPiece, dateOf, dayKey, elapsed, emptyLog, moveQuest, occurs, pieceColorKey, pieceColorOptions, piecePalette, practiceTotals, questKey, questsForDay, setPieceColor, settleTimer, specialEarned, totalXP } from './log'
 import type { Log, Performance, PieceColor, Quest } from './log'
+import { PracticeWeek, ProgressRing } from './PracticeCharts'
 import './style.css'
 
-type Modal = { kind: 'add' } | { kind: 'quest' | 'edit'; id: string; day: string } |
-  { kind: 'event'; id: string } | { kind: 'card'; card: Card; special: boolean; discovering?: boolean } | { kind: 'history' }
+type Modal = { kind: 'add' } | { kind: 'quest'; id: string; day: string } | { kind: 'edit'; id: string; day: string } |
+  { kind: 'event'; id: string } | { kind: 'card'; card: Card; special: boolean; discovering?: boolean } | { kind: 'stats' }
 
 const weekdayNames = ['Nd', 'Pn', 'Wt', 'Śr', 'Cz', 'Pt', 'So']
 const formatDate = new Intl.DateTimeFormat('pl', { day: 'numeric', month: 'long' })
@@ -244,7 +245,12 @@ function App() {
     }
   }
 
-  const { pieces, days } = practiceTotals(log, now)
+  const practice = practiceTotals(log, now)
+  const { pieces, days } = practice
+  const pieceTimes = [...pieces].sort((a, b) => b[1] - a[1])
+  const longestPractice = pieceTimes[0]?.[1] ?? 0
+  const playedToday = days.get(today) ?? 0
+  const plannedToday = questsForDay(log, today).reduce((sum, quest) => sum + quest.minutes, 0)
   const pieceStyle = (piece: string) => ({
     '--piece-color': piecePalette[colorForPiece(log.pieceColors, piece)].hex,
   } as CSSProperties)
@@ -338,26 +344,28 @@ function App() {
     <header className="top"><div className="wrap top-inner"><a className="brand" href="#main"><span>♫</span> Edi’s Quest Log</a><span className="top-label">GILDIA MUZYCZNA</span></div></header>
     <main className="wrap" id="main">
       <section className="panel profile" aria-labelledby="profile-heading">
-        <div className="profile-player">
-          <img className="avatar" src="/art/edi-avatar-v2.png" alt="" />
-          <div>
-            <div className="split profile-title">
-              <div><div className="eyebrow">GRACZ</div><h2 id="profile-heading">Edi</h2></div>
-              <strong className="xp">{xp} XP</strong>
-            </div>
-            <div className="split"><span>Do następnej karty</span><b>{xp % 100} / 100 XP</b></div>
-            <progress max={100} value={xp % 100} aria-label="Postęp do następnej karty" />
-            {earned > 0 && <a className="reward-link" href="#album">✧ Czekające odkrycia: {earned}</a>}
+        <div className="profile-summary">
+          <div className="profile-player">
+            <img className="avatar" src="/art/edi-avatar-v2.png" alt="" />
+            <div><div className="eyebrow">GRACZ</div><h2 id="profile-heading">Edi</h2><strong className="xp">{xp} XP</strong></div>
+            <button className="stats-trigger" disabled={!loaded} onClick={() => setModal({ kind: 'stats' })}>Statystyki</button>
           </div>
+          <div className="profile-rings">
+            <ProgressRing title="Dzisiaj" value={minutes(playedToday) + ' min'}
+              detail={plannedToday ? 'z ' + plannedToday + ' min' : 'Brak planu na dziś'}
+              progress={plannedToday ? playedToday / (plannedToday * 60_000) : 0} />
+            <ProgressRing title="Do następnej karty" value={xp % 100 + ' XP'} detail="ze 100 XP" progress={xp % 100 / 100} />
+          </div>
+          {earned > 0 && <a className="reward-link" href="#album">✧ Czekające odkrycia: {earned}</a>}
         </div>
-        <div><h3>Twoja praktyka</h3><p className="album-note">Dzisiaj: <strong>{minutes(days.get(today) ?? 0)} min</strong></p>
-          {pieces.size === 0 && <p className="album-note">Tu pojawi się czas ćwiczeń dla każdego utworu.</p>}
-          {[...pieces].sort((a, b) => b[1] - a[1]).map(([piece, duration]) => <div className="piece" key={piece} style={pieceStyle(piece)}>
+        <section className="piece-stats" aria-labelledby="piece-stats-heading">
+          <h3 id="piece-stats-heading">Czas gry według utworu</h3>
+          {!pieceTimes.length && <p className="album-note">Tu pojawi się czas ćwiczeń dla każdego utworu.</p>}
+          {pieceTimes.map(([piece, duration]) => <div className="piece-total" key={piece} style={pieceStyle(piece)}>
             <div className="split"><span>{piece}</span><b>{minutes(duration)} min</b></div>
-            <progress max={Math.max(...pieces.values())} value={duration} aria-label={'Czas ćwiczeń: ' + piece} />
+            <progress max={longestPractice} value={duration} aria-label={'Czas ćwiczeń: ' + piece} />
           </div>)}
-          <button className="history" disabled={!loaded} onClick={() => setModal({ kind: 'history' })}>Historia ćwiczeń i występów →</button>
-        </div>
+        </section>
       </section>
       {error && !modal && <div className="error" role="alert">{error} {!loaded && <button onClick={() => void load()}>Spróbuj ponownie</button>}</div>}
       <p className="notice" role="status">{notice}</p>
@@ -448,11 +456,12 @@ function App() {
       </div>
     </main>
     {modal && <Dialog key={modal.kind} title={modal.kind === 'add' ? 'Dodaj do planu' : modal.kind === 'edit' ? 'Edytuj quest' : modal.kind === 'quest' ? (modalQuest?.title || modalQuest?.piece || 'Quest') :
-      modal.kind === 'event' ? currentEvent?.title ?? 'Występ' : modal.kind === 'card' ? modal.card.name : 'Historia praktyki'}
+      modal.kind === 'event' ? currentEvent?.title ?? 'Występ' : modal.kind === 'stats' ? 'Statystyki' : modal.card.name}
       close={() => { setModal(null); setError('') }}
       cardMode={modal.kind === 'card' ? modal.discovering ? 'discovery' : 'preview' : undefined}
       action={currentQuest && <button onClick={() => setModal({ kind: 'edit', id: currentQuest.quest.id, day: currentQuest.day })}>Edytuj</button>}>
       {error && <p className="error" role="alert">{error}</p>}
+      {modal.kind === 'stats' && <PracticeWeek today={today} totals={practice} colors={log.pieceColors} />}
       {modal.kind === 'add' && <EntryForm day={selected} suggestions={suggestions} colors={log.pieceColors} save={(entry, color) => void update(state => {
         if ('piece' in entry) {
           state.quests.push(entry)
@@ -512,17 +521,6 @@ function App() {
           <a className="reward-link" href={'https://pl.wikipedia.org/wiki/' + encodeURIComponent(modal.card.wiki)} target="_blank" rel="noreferrer">Czytaj w Wikipedii ↗</a>
         </article>
       </div>}
-      {modal.kind === 'history' && <>
-        <h3>Ćwiczenia według dni</h3>
-        {!days.size && <p>Twoje ćwiczenia pojawią się tutaj po uruchomieniu timera.</p>}
-        <ul className="history-list">{[...days].sort(([a], [b]) => b.localeCompare(a)).map(([day, duration]) => <li className="split" key={day}><button onClick={() => { setSelected(day); setModal(null) }}>{fullDate.format(dateOf(day))}</button><strong>{minutes(duration)} min</strong></li>)}</ul>
-        <h3>Ukończone występy</h3>
-        {!specialEarned(log) && <p>Tutaj pojawią się ukończone występy.</p>}
-        <ul className="history-list">{log.performances.filter(event => event.id in log.completed).sort((a, b) => b.day.localeCompare(a.day)).map(event => <li key={event.id}>
-          <button onClick={() => setModal({ kind: 'event', id: event.id })}>{event.title} · {formatDate.format(dateOf(event.day))}</button>
-          {event.rating && <p>Ocena: {event.rating}</p>}{event.comment && <p>{event.comment}</p>}
-        </li>)}</ul>
-      </>}
     </Dialog>}
   </>
 }

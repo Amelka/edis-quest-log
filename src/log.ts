@@ -126,6 +126,7 @@ export const specialEarned = (log: Log) => log.performances.filter(event => even
 export function practiceTotals(log: Log, now: number) {
   const pieces = new Map<string, number>()
   const days = new Map<string, number>()
+  const piecesByDay = new Map<string, Map<string, number>>()
   const sessions = [...log.sessions]
   if (log.timer) sessions.push({ ...log.timer, end: Math.min(now, log.timer.deadline) })
   for (const session of sessions) {
@@ -138,11 +139,15 @@ export function practiceTotals(log: Log, now: number) {
       const key = dayKey(date)
       date.setHours(24, 0, 0, 0)
       const end = Math.min(date.getTime(), session.end)
-      days.set(key, (days.get(key) ?? 0) + end - cursor)
+      const segment = end - cursor
+      days.set(key, (days.get(key) ?? 0) + segment)
+      const dailyPieces = piecesByDay.get(key) ?? new Map<string, number>()
+      dailyPieces.set(session.piece, (dailyPieces.get(session.piece) ?? 0) + segment)
+      piecesByDay.set(key, dailyPieces)
       cursor = end
     }
   }
-  return { pieces, days }
+  return { pieces, days, piecesByDay }
 }
 
 let database: Promise<IDBDatabase> | undefined
