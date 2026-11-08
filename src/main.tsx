@@ -9,7 +9,7 @@ import { PracticeWeek, ProgressRing } from './PracticeCharts'
 import './style.css'
 
 type Modal = { kind: 'add' } | { kind: 'quest'; id: string; day: string } | { kind: 'edit'; id: string; day: string } |
-  { kind: 'event'; id: string } | { kind: 'card'; card: Card; special: boolean; discovering?: boolean } | { kind: 'stats' }
+  { kind: 'event'; id: string } | { kind: 'edit-event'; id: string } | { kind: 'card'; card: Card; special: boolean; discovering?: boolean } | { kind: 'stats' }
 
 const weekdayNames = ['Nd', 'Pn', 'Wt', 'Śr', 'Cz', 'Pt', 'So']
 const formatDate = new Intl.DateTimeFormat('pl', { day: 'numeric', month: 'long' })
@@ -62,11 +62,12 @@ function Dialog({ title, children, close, action, cardMode }: {
   </dialog>
 }
 
-function EntryForm({ day, quest, suggestions, colors, save }: {
-  day: string; quest?: Quest; suggestions: string[]; colors: Log['pieceColors'];
+function EntryForm({ day, quest, performance, awardedXP, suggestions, colors, save, remove }: {
+  day: string; quest?: Quest; performance?: Performance; awardedXP?: number;
+  suggestions: string[]; colors: Log['pieceColors']; remove?: () => void;
   save: (entry: Quest | Performance, color?: PieceColor) => void
 }) {
-  const [kind, setKind] = useState('quest')
+  const [kind, setKind] = useState(performance ? 'event' : 'quest')
   const [pieceInput, setPieceInput] = useState(quest?.piece ?? '')
   const [colorOverride, setColorOverride] = useState<{ key: string; color: PieceColor }>()
   const pieceKey = pieceColorKey(pieceInput)
@@ -83,7 +84,7 @@ function EntryForm({ day, quest, suggestions, colors, save }: {
     const start = value('start')
     const title = value('title')
     const piece = value('piece')
-    const common = { id: quest?.id ?? crypto.randomUUID(), xp: Number(value('xp')) }
+    const common = { id: quest?.id ?? performance?.id ?? crypto.randomUUID(), xp: Number(value('xp')) }
     if (!(kind === 'quest' ? piece : title)) {
       setError(kind === 'quest' ? 'Wpisz nazwę utworu.' : 'Wpisz nazwę występu.')
       return
@@ -103,10 +104,10 @@ function EntryForm({ day, quest, suggestions, colors, save }: {
       colorOverride?.key === pieceColorKey(piece) ? colorOverride.color : undefined)
   }
   return <form onSubmit={submit}>
-    {!quest && <label>Rodzaj wpisu<select value={kind} onChange={event => { setKind(event.target.value); setError('') }}>
+    {!quest && !performance && <label>Rodzaj wpisu<select value={kind} onChange={event => { setKind(event.target.value); setError('') }}>
       <option value="quest">Quest ćwiczeniowy</option><option value="event">Występ lub konkurs</option>
     </select></label>}
-    <label>Nazwa<input key={kind} name="title" defaultValue={quest?.title} required={kind === 'event'} maxLength={100}
+    <label>Nazwa<input key={kind} name="title" defaultValue={quest?.title ?? performance?.title} required={kind === 'event'} maxLength={100}
       placeholder={kind === 'quest' ? 'Opcjonalnie, np. Lewa ręka' : 'Koncert zimowy'} /></label>
     {kind === 'quest' && <>
       <label>Utwór<input name="piece" list="known-pieces" value={pieceInput} onChange={event => setPieceInput(event.target.value)} required maxLength={100} placeholder="Nokturn Es-dur" /></label>
@@ -123,7 +124,7 @@ function EntryForm({ day, quest, suggestions, colors, save }: {
     <div className="form-row">
       <label>{kind === 'quest' && (repeat !== 'once' || quest) ? 'Data od' : 'Data'}<input name="start" type="date" required defaultValue={start} onInput={event => setStart(event.currentTarget.value)} /></label>
       {kind === 'quest' && <label>Minuty<input name="minutes" type="number" min="1" max="240" defaultValue={quest?.minutes ?? 10} required /></label>}
-      <label>XP<input key={kind} name="xp" type="number" min="1" max="9999" defaultValue={kind === 'quest' ? quest?.xp ?? 20 : 100} required /></label>
+      <label>XP<input key={kind} name="xp" type="number" min="1" max="9999" defaultValue={kind === 'quest' ? quest?.xp ?? 20 : awardedXP ?? performance?.xp ?? 100} readOnly={awardedXP !== undefined} required /></label>
     </div>
     {kind === 'quest' && <>
       <label>Powtarzanie<select value={repeat} onChange={event => { setRepeat(event.target.value); setError('') }}>
@@ -138,7 +139,8 @@ function EntryForm({ day, quest, suggestions, colors, save }: {
       <label>Wskazówki nauczyciela<textarea name="tips" defaultValue={quest?.tips} rows={3} maxLength={1500} /></label>
     </>}
     {error && <p role="alert" className="error">{error}</p>}
-    <button className="primary">{quest ? 'Zapisz zmiany' : 'Zapisz w planie'}</button>
+    <button className="primary">{quest || performance ? 'Zapisz zmiany' : 'Zapisz w planie'}</button>
+    {remove && <button type="button" className="danger" onClick={remove}>Usuń występ</button>}
   </form>
 }
 
@@ -258,7 +260,7 @@ function App() {
   const earned = Math.floor(xp / 100) - regularCards.filter(card => log.revealed.includes(card.id)).length
   const specials = specialEarned(log) - specialCards.filter(card => log.revealed.includes(card.id)).length
   const quests = questsForDay(log, selected)
-  const events = log.performances.filter(event => event.day === selected)
+  const events = log.performances.filter(event => !event.deleted && event.day === selected)
   const completed = quests.filter(quest => questKey(quest, selected) in log.completed).length
   const timeline = dateRange(today, selected)
 
@@ -281,7 +283,7 @@ function App() {
   const currentKey = currentQuest ? questKey(currentQuest.quest, currentQuest.day) : ''
   const remaining = currentQuest ? Math.max(0, currentQuest.quest.minutes * 60000 - elapsed(log, currentKey, now)) : 0
   const seconds = Math.ceil(remaining / 1000)
-  const currentEvent = modal?.kind === 'event' ? log.performances.find(event => event.id === modal.id) : undefined
+  const currentEvent = (modal?.kind === 'event' || modal?.kind === 'edit-event') ? log.performances.find(event => event.id === modal.id && !event.deleted) : undefined
 
   function reorderQuest(questId: string, targetId: string) {
     if (questId === targetId) return
@@ -380,7 +382,7 @@ function App() {
             </div>
             <div className="axis" ref={axis}>{timeline.map(day => {
               const date = dateOf(day)
-              const special = log.performances.some(event => event.day === day)
+              const special = log.performances.some(event => !event.deleted && event.day === day)
               return <button key={day} aria-current={day === today ? 'date' : undefined} aria-pressed={day === selected}
                 aria-label={fullDate.format(date) + (special ? ', występ' : '')}
                 className={['day', day < today && 'past', [0, 6].includes(date.getDay()) && 'weekend', day === today && 'today', special && 'performance-day'].filter(Boolean).join(' ')}
@@ -442,7 +444,7 @@ function App() {
               </div>
             })}
             {events.map(event => <button className="entry event" key={event.id} onClick={() => setModal({ kind: 'event', id: event.id })}>
-              <span className="entry-icon"><Gem /></span><span><strong>{event.title}</strong><small>{event.id in log.completed ? 'Ukończony występ' : 'Występ · karta specjalna'}</small></span><b>+{event.xp} XP</b>
+              <span className="entry-icon"><Gem /></span><span><strong>{event.title}</strong><small>{event.id in log.completed ? 'Ukończony występ' : 'Występ · karta specjalna'}</small></span><b>+{log.completed[event.id] ?? event.xp} XP</b>
             </button>)}
           </section>
         </div>
@@ -456,10 +458,11 @@ function App() {
       </div>
     </main>
     {modal && <Dialog key={modal.kind} title={modal.kind === 'add' ? 'Dodaj do planu' : modal.kind === 'edit' ? 'Edytuj quest' : modal.kind === 'quest' ? (modalQuest?.title || modalQuest?.piece || 'Quest') :
-      modal.kind === 'event' ? currentEvent?.title ?? 'Występ' : modal.kind === 'stats' ? 'Statystyki' : modal.card.name}
+      modal.kind === 'edit-event' ? 'Edytuj występ' : modal.kind === 'event' ? currentEvent?.title ?? 'Występ' : modal.kind === 'stats' ? 'Statystyki' : modal.card.name}
       close={() => { setModal(null); setError('') }}
       cardMode={modal.kind === 'card' ? modal.discovering ? 'discovery' : 'preview' : undefined}
-      action={currentQuest && <button onClick={() => setModal({ kind: 'edit', id: currentQuest.quest.id, day: currentQuest.day })}>Edytuj</button>}>
+      action={currentQuest ? <button onClick={() => setModal({ kind: 'edit', id: currentQuest.quest.id, day: currentQuest.day })}>Edytuj</button>
+        : modal.kind === 'event' && currentEvent && <button onClick={() => setModal({ kind: 'edit-event', id: currentEvent.id })}>Edytuj</button>}>
       {error && <p className="error" role="alert">{error}</p>}
       {modal.kind === 'stats' && <PracticeWeek today={today} totals={practice} colors={log.pieceColors} />}
       {modal.kind === 'add' && <EntryForm day={selected} suggestions={suggestions} colors={log.pieceColors} save={(entry, color) => void update(state => {
@@ -499,13 +502,42 @@ function App() {
           {remaining === 0 && <button className="primary" onClick={() => completeQuest(currentQuest.quest, currentQuest.day)}>✓ Oznacz quest jako ukończony</button>}
         </>}
       </>}
-      {currentEvent && <EventDetails key={currentEvent.id} event={currentEvent} today={today} done={currentEvent.id in log.completed}
+      {modal.kind === 'edit-event' && currentEvent && <EntryForm
+        day={currentEvent.day} performance={currentEvent} awardedXP={log.completed[currentEvent.id]}
+        suggestions={suggestions} colors={log.pieceColors}
+        save={entry => {
+          if ('piece' in entry) return
+          void update(state => {
+            const event = state.performances.find(item => item.id === entry.id && !item.deleted)
+            if (!event) throw new Error('Ten występ został usunięty.')
+            event.title = entry.title
+            event.day = entry.day
+            if (!(event.id in state.completed)) event.xp = entry.xp
+          }, () => {
+            setSelected(entry.day)
+            setModal({ kind: 'event', id: entry.id })
+            setNotice('✓ Zmiany występu zapisane.')
+          })
+        }}
+        remove={() => {
+          if (!window.confirm('Usunąć występ „' + currentEvent.title + '” z kalendarza?')) return
+          void update(state => {
+            const event = state.performances.find(item => item.id === currentEvent.id)
+            if (event) event.deleted = true
+          }, () => {
+            setModal(null)
+            setNotice('✓ Występ usunięty.')
+          })
+        }} />}
+      {modal.kind === 'event' && currentEvent && <EventDetails key={currentEvent.id} event={{ ...currentEvent, xp: log.completed[currentEvent.id] ?? currentEvent.xp }} today={today} done={currentEvent.id in log.completed}
         save={(rating, comment) => void update(state => {
-          const event = state.performances.find(item => item.id === currentEvent.id)
+          const event = state.performances.find(item => item.id === currentEvent.id && !item.deleted)
           if (event && event.id in state.completed) Object.assign(event, { rating, comment })
         }, () => { setNotice('✓ Notatka zapisana.'); setModal(null) })}
         complete={() => void update(state => {
-          if (currentEvent.day <= dayKey() && !(currentEvent.id in state.completed)) state.completed[currentEvent.id] = currentEvent.xp
+          const event = state.performances.find(item => item.id === currentEvent.id && !item.deleted)
+          if (!event || event.day > dayKey()) throw new Error('Tego występu nie można teraz ukończyć.')
+          if (!(event.id in state.completed)) state.completed[event.id] = event.xp
         }, () => setNotice('✓ Występ ukończony. Karta specjalna czeka w albumie.'))} />}
       {modal.kind === 'card' && <div className={'card-presentation' + (modal.special ? ' special' : '')}>
         {modal.discovering && <div className="card-back reveal-back" aria-hidden="true">

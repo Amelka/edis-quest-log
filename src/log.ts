@@ -19,6 +19,7 @@ export type Performance = {
   xp: number
   rating: string
   comment: string
+  deleted?: true
 }
 
 type Session = {

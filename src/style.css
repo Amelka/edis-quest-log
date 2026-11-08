@@ -525,3 +525,11 @@ fieldset{margin:0;border:1px solid var(--line)}
 @media (max-width: 520px) {
   .profile-summary { grid-template-columns: minmax(0, 1fr); }
 }
+
+button.danger {
+  background: transparent;
+  border-color: #ad6489;
+  color: #ffabc9;
+}
+
+button.danger:hover:not(:disabled) { background: #4a2342; }
