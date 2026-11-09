@@ -29,11 +29,9 @@ export function ProgressRing({ title, value, detail, progress }: {
   </div>
 }
 
-export function PracticeWeek({ today, totals, colors }: {
-  today: string; totals: ReturnType<typeof practiceTotals>; colors: Log['pieceColors']
-}) {
-  const [filter, setFilter] = useState<string | null>(null)
-  const [selectedDay, setSelectedDay] = useState<string | null>(null)
+type WeekData = { today: string; totals: ReturnType<typeof practiceTotals> }
+
+function weekData({ today, totals }: WeekData) {
   const dates = Array.from({ length: 7 }, (_, index) => {
     const date = dateOf(today)
     date.setDate(date.getDate() + index - 6)
@@ -41,6 +39,39 @@ export function PracticeWeek({ today, totals, colors }: {
   })
   const pieces = [...new Set(dates.flatMap(day => [...(totals.piecesByDay.get(day)?.keys() ?? [])]))]
     .sort((a, b) => a.localeCompare(b, 'pl'))
+  return { dates, pieces }
+}
+
+export function WeeklyReportButton({ today, totals }: WeekData) {
+  const [exporting, setExporting] = useState(false)
+  const [exportError, setExportError] = useState(false)
+
+  async function exportReport() {
+    setExporting(true)
+    setExportError(false)
+    try {
+      const { downloadWeeklyReport } = await import('./weeklyReport')
+      const { dates, pieces } = weekData({ today, totals })
+      await downloadWeeklyReport(dates, pieces, totals)
+    } catch {
+      setExportError(true)
+    } finally {
+      setExporting(false)
+    }
+  }
+
+  return <div className="weekly-report-action">
+    <button type="button" disabled={exporting} onClick={exportReport}>
+      {exporting ? 'Przygotowuję PDF…' : 'Pobierz raport PDF'}
+    </button>
+    {exportError && <p className="error" role="alert">Nie udało się pobrać raportu. Spróbuj ponownie.</p>}
+  </div>
+}
+
+export function PracticeWeek({ today, totals, colors }: WeekData & { colors: Log['pieceColors'] }) {
+  const [filter, setFilter] = useState<string | null>(null)
+  const [selectedDay, setSelectedDay] = useState<string | null>(null)
+  const { dates, pieces } = weekData({ today, totals })
   const activeFilter = filter !== null && pieces.includes(filter) ? filter : null
   const activeDay = selectedDay && dates.includes(selectedDay) ? selectedDay : today
   const breakdown = [...(totals.piecesByDay.get(activeDay) ?? [])].sort((a, b) => b[1] - a[1])

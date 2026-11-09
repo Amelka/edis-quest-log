@@ -533,3 +533,6 @@ button.danger {
 }
 
 button.danger:hover:not(:disabled) { background: #4a2342; }
+
+.dialog-head:has(.weekly-report-action){flex-wrap:wrap}
+.dialog-head:has(.weekly-report-action) .dialog-actions{margin-left:auto;min-width:0;flex-shrink:1}

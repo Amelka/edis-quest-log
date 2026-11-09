@@ -1,3 +1,6 @@
 node_modules/
 dist/
 .journal/
+
+playwright-report/
+test-results/

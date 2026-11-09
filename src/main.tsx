@@ -5,7 +5,7 @@ import { regularCards, specialCards } from './cards'
 import type { Card } from './cards'
 import { accessLog, colorForPiece, dateOf, dayKey, elapsed, emptyLog, moveQuest, occurs, pieceColorKey, pieceColorOptions, piecePalette, practiceTotals, questKey, questsForDay, setPieceColor, settleTimer, specialEarned, totalXP } from './log'
 import type { Log, Performance, PieceColor, Quest } from './log'
-import { PracticeWeek, ProgressRing } from './PracticeCharts'
+import { PracticeWeek, ProgressRing, WeeklyReportButton } from './PracticeCharts'
 import './style.css'
 
 type Modal = { kind: 'add' } | { kind: 'quest'; id: string; day: string } | { kind: 'edit'; id: string; day: string } |
@@ -462,6 +462,7 @@ function App() {
       close={() => { setModal(null); setError('') }}
       cardMode={modal.kind === 'card' ? modal.discovering ? 'discovery' : 'preview' : undefined}
       action={currentQuest ? <button onClick={() => setModal({ kind: 'edit', id: currentQuest.quest.id, day: currentQuest.day })}>Edytuj</button>
+        : modal.kind === 'stats' ? <WeeklyReportButton today={today} totals={practice} />
         : modal.kind === 'event' && currentEvent && <button onClick={() => setModal({ kind: 'edit-event', id: currentEvent.id })}>Edytuj</button>}>
       {error && <p className="error" role="alert">{error}</p>}
       {modal.kind === 'stats' && <PracticeWeek today={today} totals={practice} colors={log.pieceColors} />}

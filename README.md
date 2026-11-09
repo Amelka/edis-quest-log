@@ -21,3 +21,13 @@ http://localhost:5174. Używa ona oddzielnego zapisu w przeglądarce, dzięki
 czemu testowe wpisy nie trafiają do właściwego dziennika.
 
 Ilustracje Forte i Chopina pochodzą z moodboardu Pikselowa gildia v2. Licencje fontów znajdują się w katalogu `public/art`.
+
+## Testy
+
+Po instalacji zależności przez `npm ci` uruchom testy logiki i API poleceniem
+`npm test`. Testy API wymagają `python3`.
+
+Przed pierwszym uruchomieniem testów przeglądarkowych zainstaluj Chromium
+poleceniem `npx playwright install chromium`. Następnie uruchom
+`npm run test:e2e`. Polecenie buduje aplikację i sprawdza ją na lokalnym
+serwerze Python. Testy zapisu używają osobnych katalogów tymczasowych.
