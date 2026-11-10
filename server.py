@@ -90,7 +90,37 @@ def setup_accounts():
             atomic_write(CREDENTIALS, json.dumps(accounts).encode())
 
 
+def save_journal(data, expected_revision):
+    with lock_journal():
+        current = read_journal()
+        if expected_revision != revision(current):
+            return False
+        if data != current:
+            atomic_write(BACKUP, data if current == b"null" else current)
+            atomic_write(JOURNAL, data)
+        return True
+
+
 class Handler(SimpleHTTPRequestHandler):
+    read_journal = staticmethod(read_journal)
+    save_journal = staticmethod(save_journal)
+
+    def login(self, username, password):
+        return sessions.login(json.loads(CREDENTIALS.read_bytes()), username, password)
+
+    def account(self, token):
+        return sessions.account(token)
+
+    def logout(self, token):
+        sessions.logout(token)
+
+    def valid_host(self):
+        return self.headers.get("Host") in LOCAL_HOSTS
+
+    @property
+    def secure_cookie(self):
+        return ""
+
     @property
     def cookie_name(self):
         return f"edi_session_{self.server.server_port}"
@@ -110,23 +140,23 @@ class Handler(SimpleHTTPRequestHandler):
         if token is not None:
             age = SESSION_AGE if token else 0
             self.send_header("Set-Cookie", f"{self.cookie_name}={token}; Path=/api; "
-                             f"HttpOnly; SameSite=Strict; Max-Age={age}")
+                             f"HttpOnly; SameSite=Strict; Max-Age={age}{self.secure_cookie}")
         self.end_headers()
         self.wfile.write(json.dumps({"account": account}).encode())
 
     def same_origin(self):
         host = self.headers.get("Host")
-        return host in LOCAL_HOSTS and self.headers.get("Origin") == f"http://{host}"
+        return self.valid_host() and self.headers.get("Origin") == f"http://{host}"
 
     def do_POST(self):
         if self.path not in ("/api/login", "/api/logout"):
             return self.send_error(404)
         if not self.same_origin():
             return self.send_error(403)
-        if self.path == "/api/logout":
-            sessions.logout(self.session_token())
-            return self.send_account(200, token="")
         try:
+            if self.path == "/api/logout":
+                self.logout(self.session_token())
+                return self.send_account(200, token="")
             size = int(self.headers.get("Content-Length", "0"))
             if not 0 < size <= 4096:
                 return self.send_account(400)
@@ -138,17 +168,15 @@ class Handler(SimpleHTTPRequestHandler):
             if not isinstance(username, str) or not isinstance(password, str) or len(password) > 256:
                 return self.send_account(400)
             username = username.strip().casefold()
-            accounts = json.loads(CREDENTIALS.read_bytes())
-            status, token = sessions.login(accounts, username, password)
+            status, token = self.login(username, password)
+            if token:
+                self.logout(self.session_token())
         except (ValueError, UnicodeError):
             return self.send_account(400)
         except OSError as error:
             self.log_error("%s", error)
             return self.send_account(503)
-        if token:
-            sessions.logout(self.session_token())
         self.send_account(status, ACCOUNTS[username] if token else None, token)
-
 
     def send_journal(self, data):
         self.send_response(200)
@@ -161,15 +189,15 @@ class Handler(SimpleHTTPRequestHandler):
     def do_GET(self):
         if self.path not in (ROUTE, "/api/session"):
             return super().do_GET()
-        if self.headers.get("Host") not in LOCAL_HOSTS:
+        if not self.valid_host():
             return self.send_error(403)
-        account = sessions.account(self.session_token())
-        if self.path == "/api/session":
-            return self.send_account(200, account)
-        if not account:
-            return self.send_account(401)
         try:
-            data = read_journal()
+            account = self.account(self.session_token())
+            if self.path == "/api/session":
+                return self.send_account(200, account)
+            if not account:
+                return self.send_account(401)
+            data = self.read_journal()
         except OSError as error:
             self.log_error("%s", error)
             return self.send_error(500)
@@ -180,9 +208,9 @@ class Handler(SimpleHTTPRequestHandler):
             return self.send_error(404)
         if not self.same_origin():
             return self.send_error(403)
-        if not sessions.account(self.session_token()):
-            return self.send_account(401)
         try:
+            if not self.account(self.session_token()):
+                return self.send_account(401)
             size = int(self.headers.get("Content-Length", "0"))
             if not 0 < size <= 16 * 1024 * 1024:
                 return self.send_error(413)
@@ -193,17 +221,10 @@ class Handler(SimpleHTTPRequestHandler):
                             for key in ("quests", "performances", "sessions", "revealed")) or
                     not isinstance(log.get("completed"), dict)):
                 return self.send_error(400)
+            if not self.save_journal(data, self.headers.get("If-Match")):
+                return self.send_error(412)
         except ValueError:
             return self.send_error(400)
-
-        try:
-            with lock_journal():
-                current = read_journal()
-                if self.headers.get("If-Match") != revision(current):
-                    return self.send_error(412)
-                if data != current:
-                    atomic_write(BACKUP, data if current == b"null" else current)
-                    atomic_write(JOURNAL, data)
         except OSError as error:
             self.log_error("%s", error)
             return self.send_error(500)

@@ -1,0 +1,6 @@
+.journal/
+.env*
+.DS_Store
+test-results/
+playwright-report/
+discovery/

@@ -1,0 +1,11 @@
+{
+  "framework": "vite",
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
+  "regions": ["fra1"],
+  "functions": {
+    "api/*.py": {
+      "excludeFiles": "{.journal/**,.git/**,.env*,node_modules/**,dist/**,public/**,tests/**,test-results/**,discovery/**}"
+    }
+  }
+}

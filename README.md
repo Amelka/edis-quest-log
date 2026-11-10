@@ -36,3 +36,18 @@ Przed pierwszym uruchomieniem testów przeglądarkowych zainstaluj Chromium
 poleceniem `npx playwright install chromium`. Następnie uruchom
 `npm run test:e2e`. Polecenie buduje aplikację i sprawdza ją na lokalnym
 serwerze Python. Testy zapisu używają osobnych katalogów tymczasowych.
+
+### Wersja online
+
+Vercel buduje aplikację przez `npm run build`. Funkcje pod `/api` używają
+`DATABASE_URL` z integracji Neon. Zmienne systemowe Vercel określają dozwolone
+adresy wdrożeń. Przy własnej domenie ustaw `JOURNAL_HOST` na jej nazwę bez
+protokołu. Dane logowania i pliki dziennika nie należą do repozytorium.
+
+Przed przełączeniem zamknij lokalny dziennik, aby nikt nie dopisywał danych.
+W środowisku z ustawionym `DATABASE_URL` do pustej bazy zainstaluj pakiety
+z `requirements.txt` i uruchom `python3 -B scripts/import_neon.py`. Skrypt
+tworzy lokalną kopię, przenosi oba istniejące loginy oraz bieżący i poprzedni
+zapis, a następnie porównuje zapisane bajty. Odmawia nadpisania innej historii.
+Testy zapisu uruchamiaj z osobną bazą. Po przełączeniu korzystaj z wersji
+online, żeby uniknąć równoległych historii.
