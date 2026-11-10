@@ -1,4 +1,5 @@
 """Run the production handler on a system-assigned port with test data."""
+import json
 import os
 import sys
 from functools import partial
@@ -10,6 +11,12 @@ root = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(root))
 
 import server
+
+if not server.CREDENTIALS.exists():
+    server.CREDENTIALS.write_text(json.dumps({
+        "edi": server.password_record("test-edi-password"),
+        "mama": server.password_record("test-mama-password"),
+    }))
 
 with server.ThreadingHTTPServer(
     ("127.0.0.1", 0), partial(server.Handler, directory=str(root / "dist"))

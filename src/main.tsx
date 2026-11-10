@@ -6,6 +6,8 @@ import type { Card } from './cards'
 import { accessLog, colorForPiece, dateOf, dayKey, elapsed, emptyLog, moveQuest, occurs, pieceColorKey, pieceColorOptions, piecePalette, practiceTotals, questKey, questsForDay, setPieceColor, settleTimer, specialEarned, totalXP } from './log'
 import type { Log, Performance, PieceColor, Quest } from './log'
 import { PracticeWeek, ProgressRing, WeeklyReportButton } from './PracticeCharts'
+import { AuthGate } from './AuthGate'
+import type { Account } from './AuthGate'
 import './style.css'
 
 type Modal = { kind: 'add' } | { kind: 'quest'; id: string; day: string } | { kind: 'edit'; id: string; day: string } |
@@ -191,7 +193,8 @@ function EventDetails({ event, done, today, save, complete }: {
   </>
 }
 
-function App() {
+function App({ account, logout }: { account: Account; logout: () => Promise<void> }) {
+  const [logoutError, setLogoutError] = useState(false)
   const [log, setLog] = useState(emptyLog)
   const [loaded, setLoaded] = useState(false)
   const [now, setNow] = useState(Date.now)
@@ -343,8 +346,13 @@ function App() {
   }
 
   return <>
-    <header className="top"><div className="wrap top-inner"><a className="brand" href="#main"><span>♫</span> Edi’s Quest Log</a><span className="top-label">GILDIA MUZYCZNA</span></div></header>
+    <header className="top"><div className="wrap top-inner"><a className="brand" href="#main"><span>♫</span> Edi’s Quest Log</a><div className="account-actions">
+      <span className="top-label">Konto {account}</span>
+      {!import.meta.env.DEV && <button onClick={() => void logout().catch(() => setLogoutError(true))}>Wyloguj się</button>}
+    </div></div></header>
     <main className="wrap" id="main">
+      {account === 'Mama' && <p className="account-notice">Jesteś na koncie Mamy i obsługujesz profil Ediego.</p>}
+      {logoutError && <p className="error" role="alert">Nie udało się wylogować. Spróbuj ponownie.</p>}
       <section className="panel profile" aria-labelledby="profile-heading">
         <div className="profile-summary">
           <div className="profile-player">
@@ -558,4 +566,4 @@ function App() {
   </>
 }
 
-createRoot(document.getElementById('root')!).render(<App />)
+createRoot(document.getElementById('root')!).render(<AuthGate>{(account, logout) => <App key={account} account={account} logout={logout} />}</AuthGate>)

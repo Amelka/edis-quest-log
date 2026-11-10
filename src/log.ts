@@ -1,5 +1,7 @@
 /// <reference types="vite/client" />
 
+export const sessionExpired = 'edi-session-expired'
+
 export type Quest = {
   id: string
   title?: string
@@ -214,8 +216,13 @@ async function accessBrowserLog(change?: (log: Log) => void): Promise<Log | unde
 
 type JournalSnapshot = { log: Log | null; revision: string }
 
+function checkSession(response: Response) {
+  if (response.status === 401) window.dispatchEvent(new Event(sessionExpired))
+}
+
 async function readJournal(): Promise<JournalSnapshot> {
   const response = await fetch('/api/journal', { cache: 'no-store' })
+  checkSession(response)
   const revision = response.headers.get('ETag')
   if (!response.ok || !revision) throw new Error('Nie udało się odczytać pliku dziennika.')
   return { log: await response.json(), revision }
@@ -227,6 +234,7 @@ async function writeJournal(log: Log, revision: string) {
     headers: { 'Content-Type': 'application/json', 'If-Match': revision },
     body: JSON.stringify(log),
   })
+  checkSession(response)
   if (response.status === 412) return false
   if (!response.ok) throw new Error('Nie udało się zapisać pliku dziennika.')
   return true

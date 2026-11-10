@@ -23,6 +23,9 @@ const test = base.extend<{ openJournal: (seed?: Partial<Log>) => Promise<void> }
         await page.clock.install({ time: new Date(now.getTime() - 60_000) })
         await page.clock.pauseAt(now)
         await page.goto(line)
+        await page.getByLabel('Nazwa użytkownika').fill('Edi')
+        await page.getByLabel('Hasło').fill('test-edi-password')
+        await page.getByRole('button', { name: 'Zaloguj się' }).click()
         await expect(page.getByRole('button', { name: 'Statystyki' })).toBeEnabled()
       })
     } finally {
@@ -120,4 +123,14 @@ test('filtr tygodnia zmienia kolumny, a szczegóły dnia nadal pokazują wszystk
   await download.saveAs(testInfo.outputPath('raport.pdf'))
   await dialog.getByRole('button', { name: 'Wszystkie' }).click()
   await expect(bars.getByRole('button', { name: /7 listopada.*5 min/ })).toBeVisible()
+})
+
+test('Mama po zalogowaniu widzi ten sam dziennik Ediego', async ({ page, openJournal }) => {
+  await openJournal({ completed: { previous: 42 } })
+  await page.getByRole('button', { name: 'Wyloguj się' }).click()
+  await page.getByLabel('Nazwa użytkownika').fill('Mama')
+  await page.getByLabel('Hasło').fill('test-mama-password')
+  await page.getByRole('button', { name: 'Zaloguj się' }).click()
+  await expect(page.getByText('Jesteś na koncie Mamy i obsługujesz profil Ediego.')).toBeVisible()
+  await expect(page.locator('.profile-player .xp')).toHaveText('42 XP')
 })

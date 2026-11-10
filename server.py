@@ -5,10 +5,14 @@ import os
 import subprocess
 from contextlib import contextmanager
 from functools import partial
+from getpass import getpass
+from http.cookies import CookieError, SimpleCookie
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 from threading import Lock
+
+from auth import ACCOUNTS, SESSION_AGE, Sessions, password_record
 
 # Separate ports let both macOS accounts run the journal during fast user switching.
 PORT = 20000 + os.getuid() % 40000
@@ -18,7 +22,9 @@ ROUTE = "/api/journal"
 DATA = Path(os.environ.get("EDI_QUEST_DATA_DIR") or Path(__file__).resolve().parent / ".journal")
 JOURNAL = DATA / "journal.json"
 BACKUP = DATA / "journal.previous.json"
+CREDENTIALS = DATA / "accounts.json"
 write_lock = Lock()
+sessions = Sessions()
 
 
 @contextmanager
@@ -61,7 +67,89 @@ def atomic_write(path, data):
             temp_path.unlink(missing_ok=True)
 
 
+def setup_accounts():
+    if CREDENTIALS.exists():
+        return
+    if not os.isatty(0):
+        raise RuntimeError("Uruchom dziennik w Terminalu, żeby ustawić hasła dla Ediego i Mamy.")
+    accounts = {}
+    print("Pierwsze uruchomienie: ustaw hasła dla kont Edi i Mama.")
+    for username, name in ACCOUNTS.items():
+        while True:
+            password = getpass(f"Hasło dla konta {name} (co najmniej 8 znaków): ")
+            if not 8 <= len(password) <= 256:
+                print("Hasło musi mieć od 8 do 256 znaków.")
+                continue
+            if password != getpass("Powtórz hasło: "):
+                print("Hasła się różnią. Spróbuj ponownie.")
+                continue
+            accounts[username] = password_record(password)
+            break
+    with lock_journal():
+        if not CREDENTIALS.exists():
+            atomic_write(CREDENTIALS, json.dumps(accounts).encode())
+
+
 class Handler(SimpleHTTPRequestHandler):
+    @property
+    def cookie_name(self):
+        return f"edi_session_{self.server.server_port}"
+
+    def session_token(self):
+        try:
+            cookie = SimpleCookie(self.headers.get("Cookie", ""))
+            value = cookie.get(self.cookie_name)
+            return value.value if value else ""
+        except CookieError:
+            return ""
+
+    def send_account(self, status, account=None, token=None):
+        self.send_response(status)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Cache-Control", "no-store")
+        if token is not None:
+            age = SESSION_AGE if token else 0
+            self.send_header("Set-Cookie", f"{self.cookie_name}={token}; Path=/api; "
+                             f"HttpOnly; SameSite=Strict; Max-Age={age}")
+        self.end_headers()
+        self.wfile.write(json.dumps({"account": account}).encode())
+
+    def same_origin(self):
+        host = self.headers.get("Host")
+        return host in LOCAL_HOSTS and self.headers.get("Origin") == f"http://{host}"
+
+    def do_POST(self):
+        if self.path not in ("/api/login", "/api/logout"):
+            return self.send_error(404)
+        if not self.same_origin():
+            return self.send_error(403)
+        if self.path == "/api/logout":
+            sessions.logout(self.session_token())
+            return self.send_account(200, token="")
+        try:
+            size = int(self.headers.get("Content-Length", "0"))
+            if not 0 < size <= 4096:
+                return self.send_account(400)
+            fields = json.loads(self.rfile.read(size))
+            if not isinstance(fields, dict):
+                return self.send_account(400)
+            username = fields.get("username")
+            password = fields.get("password")
+            if not isinstance(username, str) or not isinstance(password, str) or len(password) > 256:
+                return self.send_account(400)
+            username = username.strip().casefold()
+            accounts = json.loads(CREDENTIALS.read_bytes())
+            status, token = sessions.login(accounts, username, password)
+        except (ValueError, UnicodeError):
+            return self.send_account(400)
+        except OSError as error:
+            self.log_error("%s", error)
+            return self.send_account(503)
+        if token:
+            sessions.logout(self.session_token())
+        self.send_account(status, ACCOUNTS[username] if token else None, token)
+
+
     def send_journal(self, data):
         self.send_response(200)
         self.send_header("Content-Type", "application/json")
@@ -71,10 +159,15 @@ class Handler(SimpleHTTPRequestHandler):
         self.wfile.write(data)
 
     def do_GET(self):
-        if self.path != ROUTE:
+        if self.path not in (ROUTE, "/api/session"):
             return super().do_GET()
         if self.headers.get("Host") not in LOCAL_HOSTS:
             return self.send_error(403)
+        account = sessions.account(self.session_token())
+        if self.path == "/api/session":
+            return self.send_account(200, account)
+        if not account:
+            return self.send_account(401)
         try:
             data = read_journal()
         except OSError as error:
@@ -85,9 +178,10 @@ class Handler(SimpleHTTPRequestHandler):
     def do_PUT(self):
         if self.path != ROUTE:
             return self.send_error(404)
-        host = self.headers.get("Host")
-        if host not in LOCAL_HOSTS or self.headers.get("Origin") != f"http://{host}":
+        if not self.same_origin():
             return self.send_error(403)
+        if not sessions.account(self.session_token()):
+            return self.send_account(401)
         try:
             size = int(self.headers.get("Content-Length", "0"))
             if not 0 < size <= 16 * 1024 * 1024:
@@ -127,6 +221,13 @@ if __name__ == "__main__":
         raise SystemExit(1)
 
     with server:
+        try:
+            setup_accounts()
+        except (RuntimeError, OSError) as error:
+            print("Nie udało się przygotować kont:", error)
+            raise SystemExit(1)
+        except KeyboardInterrupt:
+            raise SystemExit(130)
         print(f"Dziennik działa pod adresem http://{ADDRESS}. Zostaw to okno otwarte podczas ćwiczeń.")
         if os.environ.get("EDI_QUEST_NO_OPEN") != "1":
             subprocess.run(["/usr/bin/open", f"http://{ADDRESS}/"], check=False)
