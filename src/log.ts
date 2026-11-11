@@ -214,7 +214,7 @@ async function accessBrowserLog(change?: (log: Log) => void): Promise<Log | unde
   })
 }
 
-type JournalSnapshot = { log: Log | null; revision: string }
+type JournalSnapshot = { log: Log | null; revision: string; revisionHeader: string }
 
 function checkSession(response: Response) {
   if (response.status === 401) window.dispatchEvent(new Event(sessionExpired))
@@ -223,15 +223,17 @@ function checkSession(response: Response) {
 async function readJournal(): Promise<JournalSnapshot> {
   const response = await fetch('/api/journal', { cache: 'no-store' })
   checkSession(response)
-  const revision = response.headers.get('ETag')
+  const journalRevision = response.headers.get('X-Journal-Revision')
+  const revision = journalRevision ?? response.headers.get('ETag')
+  const revisionHeader = journalRevision ? 'X-Journal-Revision' : 'If-Match'
   if (!response.ok || !revision) throw new Error('Nie udało się odczytać pliku dziennika.')
-  return { log: await response.json(), revision }
+  return { log: await response.json(), revision, revisionHeader }
 }
 
-async function writeJournal(log: Log, revision: string) {
+async function writeJournal(log: Log, { revision, revisionHeader }: JournalSnapshot) {
   const response = await fetch('/api/journal', {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json', 'If-Match': revision },
+    headers: { 'Content-Type': 'application/json', [revisionHeader]: revision },
     body: JSON.stringify(log),
   })
   checkSession(response)
@@ -251,7 +253,7 @@ export async function accessLog(change?: (log: Log) => void): Promise<Log> {
   const now = Date.now()
   if (log.timer && log.timer.deadline <= now) settleTimer(log, now)
   change(log)
-  if (!await writeJournal(log, snapshot.revision)) {
+  if (!await writeJournal(log, snapshot)) {
     throw new Error('Dziennik zmienił się w innym oknie. Spróbuj zapisać ponownie.')
   }
   return log

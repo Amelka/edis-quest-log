@@ -182,7 +182,9 @@ class Handler(SimpleHTTPRequestHandler):
         self.send_response(200)
         self.send_header("Content-Type", "application/json")
         self.send_header("Cache-Control", "no-store")
-        self.send_header("ETag", revision(data))
+        tag = revision(data)
+        self.send_header("ETag", tag)
+        self.send_header("X-Journal-Revision", tag)
         self.end_headers()
         self.wfile.write(data)
 
@@ -221,7 +223,8 @@ class Handler(SimpleHTTPRequestHandler):
                             for key in ("quests", "performances", "sessions", "revealed")) or
                     not isinstance(log.get("completed"), dict)):
                 return self.send_error(400)
-            if not self.save_journal(data, self.headers.get("If-Match")):
+            expected = self.headers.get("X-Journal-Revision", self.headers.get("If-Match"))
+            if not self.save_journal(data, expected):
                 return self.send_error(412)
         except ValueError:
             return self.send_error(400)

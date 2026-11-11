@@ -40,16 +40,16 @@ class JournalTest(unittest.TestCase):
         server.wait(timeout=5)
         server.stdout.close()
 
-    def request(self, body=None, tag=None, origin=None, cookie=None):
+    def request(self, body=None, tag=None, origin=None, cookie=None, revision_header="X-Journal-Revision"):
         headers = {"Cookie": self.cookie if cookie is None else cookie}
         if body is not None:
-            headers.update({"If-Match": tag, "Origin": origin or self.origin,
+            headers.update({revision_header: tag, "Origin": origin or self.origin,
                             "Content-Type": "application/json"})
         request = Request(self.origin + "/api/journal", data=body, headers=headers,
                           method="GET" if body is None else "PUT")
         try:
             with urlopen(request, timeout=5) as response:
-                return response.status, json.load(response), response.headers["ETag"]
+                return response.status, json.load(response), response.headers["X-Journal-Revision"]
         except HTTPError as error:
             with error:
                 return error.code, None, None
@@ -109,3 +109,7 @@ class JournalTest(unittest.TestCase):
             self.assertEqual(response.status, 200)
         self.assertEqual(self.request(cookie=mama)[0], 401)
         self.assertEqual(self.request(), saved)
+
+    def test_legacy_if_match_still_works(self):
+        _, _, tag = self.request()
+        self.assertEqual(self.request(self.journal(20), tag, revision_header="If-Match")[0], 200)
