@@ -19,6 +19,12 @@ export const regularCards: Card[] = [
   { id: 'arpeggio', name: 'Arpeggio', detail: 'Technika · dźwięki akordu po kolei', description: 'Przy arpeggio dźwięki akordu brzmią jeden po drugim. Zagraj kolejno do, mi i sol, tak jak trzy slime’y podskakują coraz wyżej po schodach.', wiki: 'Arpeggio' },
   { id: 'glissando', name: 'Glissando', detail: 'Technika · ślizg po dźwiękach', description: 'Glissando to płynny ślizg przez kolejne dźwięki w górę lub w dół. Na fortepianie słychać wtedy serię klawiszy, jakby dźwięki zjeżdżały po wodnej zjeżdżalni.', wiki: 'Glissando' },
   { id: 'ostinato', name: 'Ostinato', detail: 'Budowa utworu · powtarzany motyw', description: 'Ostinato to krótki motyw, który powtarza się w utworze. Żółw wybija wciąż ten sam rytm. Na pianinie lewa ręka może tak samo powtarzać swój wzór, gdy prawa gra melodię.', wiki: 'Ostinato' },
+  { id: 'ritardando', name: 'Ritardando', detail: 'Tempo · coraz wolniej', description: 'Gdy widzisz rit., stopniowo zwalniaj. Wyobraź sobie, że jedziesz po taśmociągu w spiralnej muszli i powoli wytracasz rozpęd.', wiki: 'Tempo_(muzyka)' },
+  { id: 'accelerando', name: 'Accelerando', detail: 'Tempo · coraz szybciej', description: 'Gdy widzisz accel., stopniowo przyspieszaj. Wyobraź sobie, że nabierasz rozpędu na rampie, żeby wystrzelić w kosmos.', wiki: 'Tempo_(muzyka)' },
+  { id: 'sforzando', name: 'Sforzando', detail: 'Dynamika · mocny akcent', description: 'Gdy widzisz sfz, zagraj oznaczoną nutę lub akord z nagłym, mocnym akcentem. Wyobraź sobie, że skaczesz na bęben i wydobywasz z niego jedno potężne bum!', wiki: 'Dynamika_(muzyka)' },
+  { id: 'tenuto', name: 'Tenuto', detail: 'Artykulacja · pełna długość nuty', description: 'Gdy widzisz kreskę tenuto nad nutą lub pod nią, przytrzymaj dźwięk przez całą zapisaną długość. Wyobraź sobie, że rozciągasz swój sprężysty ogon między dwoma kołkami i trzymasz go do końca odliczania.', wiki: 'Tenuto' },
+  { id: 'pauza', name: 'Pauza', detail: 'Zapis nutowy · chwila ciszy', description: 'Gdy widzisz pauzę, przez wskazany czas zachowaj ciszę i licz dalej w myślach. Wyobraź sobie, że siedzisz nieruchomo w bańce i czekasz na moment, kiedy znów możesz się ruszyć.', wiki: 'Pauza_(muzyka)' },
+  { id: 'tryl', name: 'Tryl', detail: 'Ozdobnik · dwa dźwięki na zmianę', description: 'Gdy grasz tryl, szybko przechodź z jednego dźwięku na sąsiedni i z powrotem. Wyobraź sobie, że przeskakujesz między dwoma klawiszami, raz na jeden, raz na drugi.', wiki: 'Tryl' },
 ]
 
 export const specialCards: Card[] = [
