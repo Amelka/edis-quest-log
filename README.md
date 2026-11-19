@@ -22,7 +22,7 @@ Do pracy nad kodem potrzebujesz Node.js 22 i npm. W katalogu projektu uruchom
 wersję. Uruchom ją dwuklikiem lub przez `npm run preview`.
 
 `npm run dev` otwiera osobną wersję deweloperską pod adresem
-http://localhost:5174. Używa ona oddzielnego zapisu w przeglądarce, dzięki
+http://127.0.0.1:5174. Używa ona oddzielnego zapisu w przeglądarce, dzięki
 czemu testowe wpisy nie trafiają do właściwego dziennika.
 
 Ilustracje Forte i Chopina pochodzą z moodboardu Pikselowa gildia v2. Licencje fontów znajdują się w katalogu `public/art`.
@@ -51,3 +51,34 @@ tworzy lokalną kopię, przenosi oba istniejące loginy oraz bieżący i poprzed
 zapis, a następnie porównuje zapisane bajty. Odmawia nadpisania innej historii.
 Testy zapisu uruchamiaj z osobną bazą. Po przełączeniu korzystaj z wersji
 online, żeby uniknąć równoległych historii.
+
+## Karty fortepianowe i Spotify
+
+Podgląd sześciu nowych kart w modalach: `http://127.0.0.1:5174/?preview=special-cards`.
+Sześć kart utworów zastępuje kolekcję kompozytorów w albumie aplikacji.
+Dotychczasowe identyfikatory miejsc w kolekcji pozostają zachowane: odkryte
+karty zachowują pozycję i liczbę, a pozostałe odkrywa się za występy jak wcześniej.
+Podgląd umożliwia obejrzenie wszystkich sześciu kart bez zmiany dziennika.
+
+Odtwarzanie na karcie używa Spotify Web Playback SDK i konta Spotify Premium.
+Utwór uruchamia się przy otwarciu karty po połączeniu konta. Jeśli przeglądarka
+zablokuje automatyczny start, użyj „Odtwórz”. Zamknięcie modala zatrzymuje
+odtwarzanie. Urządzenie pozostaje połączone do zamknięcia podglądu lub odłączenia konta. Link „Posłuchaj w Spotify” działa niezależnie.
+
+1. Utwórz aplikację w https://developer.spotify.com/dashboard (Web API i Web Playback SDK).
+2. W Settings dodaj Redirect URI `http://127.0.0.1:5174/`. W User Management
+   dodaj konto, które będzie słuchało, jeśli wymaga tego tryb deweloperski.
+3. Utwórz `.env.local` na podstawie `.env.example` i wpisz publiczny Client ID.
+   Client Secret nie jest używany ani umieszczany w przeglądarce.
+4. Uruchom ponownie Vite i otwórz podgląd przez `127.0.0.1`, nie `localhost`.
+   Wybierz kartę i „Połącz Spotify Premium”. Zgoda obejmuje streaming oraz
+   sterowanie odtwarzaniem; uruchomienie muzyki może przenieść odtwarzanie
+   z innego urządzenia Spotify do tej przeglądarki.
+
+Logowanie korzysta z Authorization Code PKCE (S256), jednorazowego `state`
+i odświeżania tokenów. Tokeny są w `sessionStorage` tej karty przeglądarki;
+„Odłącz konto” je usuwa. Nie są zapisywane w dzienniku ani przesyłane do jego API.
+Dla wdrożenia ustaw `VITE_SPOTIFY_REDIRECT_URI` na dokładny adres HTTPS
+zarejestrowany w Spotify. Lokalny launcher używa zmiennego portu, więc do testów
+Spotify używaj stałego portu Vite. Pełny streaming wymaga ręcznej próby po połączeniu konta Premium;
+testy automatyczne używają atrapy SDK.

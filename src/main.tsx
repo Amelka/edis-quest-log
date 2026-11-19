@@ -9,6 +9,10 @@ import { PracticeWeek, ProgressRing, WeeklyReportButton } from './PracticeCharts
 import { AuthGate } from './AuthGate'
 import type { Account } from './AuthGate'
 import './style.css'
+import { MusicCardsPreview } from './MusicCardsPreview'
+import { finishSpotifyLogin, hasSpotifySession, spotifyClientId } from './spotifyAuth'
+import { MusicCardContent } from './MusicCardContent'
+import { activateSpotify, prepareSpotify, disposeSpotify } from './spotifyPlayer'
 
 type Modal = { kind: 'add' } | { kind: 'quest'; id: string; day: string } | { kind: 'edit'; id: string; day: string } |
   { kind: 'event'; id: string } | { kind: 'edit-event'; id: string } | { kind: 'card'; card: Card; special: boolean; discovering?: boolean } | { kind: 'stats' }
@@ -17,7 +21,7 @@ const weekdayNames = ['Nd', 'Pn', 'Wt', 'Śr', 'Cz', 'Pt', 'So']
 const formatDate = new Intl.DateTimeFormat('pl', { day: 'numeric', month: 'long' })
 const fullDate = new Intl.DateTimeFormat('pl', { weekday: 'long', day: 'numeric', month: 'long' })
 const minutes = (ms: number) => Math.floor(ms / 60000)
-const cardUrl = (card: Card) => '/art/' + card.id + '.jpg'
+const cardUrl = (card: Card) => card.image || '/art/' + card.id + '.jpg'
 
 function dateRange(today: string, selected: string) {
   const start = dateOf(today)
@@ -43,8 +47,8 @@ function Gem() {
   </svg>
 }
 
-function Dialog({ title, children, close, action, cardMode }: {
-  title: string; children: ReactNode; close: () => void; action?: ReactNode; cardMode?: 'preview' | 'discovery'
+function Dialog({ title, children, close, action, cardMode, musicMode }: {
+  title: string; children: ReactNode; close: () => void; action?: ReactNode; cardMode?: 'preview' | 'discovery'; musicMode?: boolean
 }) {
   const ref = useRef<HTMLDialogElement>(null)
   useEffect(() => {
@@ -52,7 +56,7 @@ function Dialog({ title, children, close, action, cardMode }: {
     element?.showModal()
     return () => element?.close()
   }, [])
-  return <dialog className={cardMode ? 'card-dialog ' + cardMode : undefined} ref={ref} aria-labelledby="dialog-title" onCancel={event => { event.preventDefault(); close() }}>
+  return <dialog className={cardMode ? 'card-dialog ' + cardMode + (musicMode ? ' music-dialog' : '') : undefined} ref={ref} aria-labelledby="dialog-title" onCancel={event => { event.preventDefault(); close() }}>
     <div className="dialog-head">
       {!cardMode && <h2 id="dialog-title">{title}</h2>}
       <div className="dialog-actions">
@@ -208,6 +212,27 @@ function App({ account, logout }: { account: Account; logout: () => Promise<void
   const channel = useRef<BroadcastChannel | null>(null)
   const busy = useRef(false)
 
+  useEffect(() => {
+    if (spotifyClientId && hasSpotifySession()) void prepareSpotify().catch(() => {})
+    return () => disposeSpotify()
+  }, [])
+
+  useEffect(() => {
+    if (!loaded) return
+    const url = new URL(location.href)
+    const requested = url.searchParams.get('music-card')
+    if (!requested) return
+    const card = specialCards.find(entry => entry.music?.id === requested)
+    if (card && log.revealed.includes(card.id)) setModal({ kind: 'card', card, special: true })
+    url.searchParams.delete('music-card')
+    history.replaceState(null, '', url.pathname + url.search + url.hash)
+  }, [loaded, log.revealed])
+
+  function openCard(card: Card, special: boolean) {
+    if (card.music) activateSpotify()
+    setModal({ kind: 'card', card, special })
+  }
+
   async function load() {
     try {
       setLog(await accessLog())
@@ -295,6 +320,7 @@ function App({ account, logout }: { account: Account; logout: () => Promise<void
   }
 
   function reveal(special: boolean) {
+    if (special) activateSpotify()
     let card: Card | undefined
     void update(state => {
       const deck = special ? specialCards : regularCards
@@ -459,8 +485,8 @@ function App({ account, logout }: { account: Account; logout: () => Promise<void
         <section className="panel album" id="album" aria-labelledby="album-heading">
           <div className="eyebrow">03 / KOLEKCJA</div><h2 id="album-heading">Album kart</h2>
           <div className="album-layout">
-            <AlbumRow cards={regularCards} log={log} available={earned} special={false} open={(card, special) => setModal({ kind: 'card', card, special })} reveal={reveal} />
-            <AlbumRow cards={specialCards} log={log} available={specials} special open={(card, special) => setModal({ kind: 'card', card, special })} reveal={reveal} />
+            <AlbumRow cards={regularCards} log={log} available={earned} special={false} open={openCard} reveal={reveal} />
+            <AlbumRow cards={specialCards} log={log} available={specials} special open={openCard} reveal={reveal} />
           </div>
         </section>
       </div>
@@ -468,6 +494,7 @@ function App({ account, logout }: { account: Account; logout: () => Promise<void
     {modal && <Dialog key={modal.kind} title={modal.kind === 'add' ? 'Dodaj do planu' : modal.kind === 'edit' ? 'Edytuj quest' : modal.kind === 'quest' ? (modalQuest?.title || modalQuest?.piece || 'Quest') :
       modal.kind === 'edit-event' ? 'Edytuj występ' : modal.kind === 'event' ? currentEvent?.title ?? 'Występ' : modal.kind === 'stats' ? 'Statystyki' : modal.card.name}
       close={() => { setModal(null); setError('') }}
+      musicMode={modal.kind === 'card' && Boolean(modal.card.music)}
       cardMode={modal.kind === 'card' ? modal.discovering ? 'discovery' : 'preview' : undefined}
       action={currentQuest ? <button onClick={() => setModal({ kind: 'edit', id: currentQuest.quest.id, day: currentQuest.day })}>Edytuj</button>
         : modal.kind === 'stats' ? <WeeklyReportButton today={today} totals={practice} />
@@ -552,7 +579,7 @@ function App({ account, logout }: { account: Account; logout: () => Promise<void
         {modal.discovering && <div className="card-back reveal-back" aria-hidden="true">
           <b>{modal.special ? '✦' : '♫'}</b>
         </div>}
-        <article className="card-detail">
+        {modal.card.music ? <MusicCardContent key={modal.card.music.id} card={modal.card.music} /> : <article className="card-detail">
           <h2 id="dialog-title">{modal.card.name}</h2>
           <div className="card-art">
             <img src={cardUrl(modal.card)} alt={'Ilustracja karty ' + modal.card.name} />
@@ -560,10 +587,13 @@ function App({ account, logout }: { account: Account; logout: () => Promise<void
           <p className="eyebrow">{modal.card.detail}</p>
           <p>{modal.card.description}</p>
           <a className="reward-link" href={'https://pl.wikipedia.org/wiki/' + encodeURIComponent(modal.card.wiki)} target="_blank" rel="noreferrer">Czytaj w Wikipedii ↗</a>
-        </article>
+        </article>}
       </div>}
     </Dialog>}
   </>
 }
 
-createRoot(document.getElementById('root')!).render(<AuthGate>{(account, logout) => <App key={account} account={account} logout={logout} />}</AuthGate>)
+void finishSpotifyLogin().finally(() => {
+  const preview = new URLSearchParams(location.search).get('preview') === 'special-cards'
+  createRoot(document.getElementById('root')!).render(preview ? <MusicCardsPreview /> : <AuthGate>{(account, logout) => <App key={account} account={account} logout={logout} />}</AuthGate>)
+})

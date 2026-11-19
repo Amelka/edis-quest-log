@@ -1,9 +1,14 @@
+import { musicCards } from './musicCards'
+import type { MusicCard } from './musicCards'
+
 export type Card = {
   id: string
   name: string
   detail: string
   description: string
   wiki: string
+  image?: string
+  music?: MusicCard
 }
 
 export const regularCards: Card[] = [
@@ -27,11 +32,15 @@ export const regularCards: Card[] = [
   { id: 'tryl', name: 'Tryl', detail: 'Ozdobnik · dwa dźwięki na zmianę', description: 'Gdy grasz tryl, szybko przechodź z jednego dźwięku na sąsiedni i z powrotem. Wyobraź sobie, że przeskakujesz między dwoma klawiszami, raz na jeden, raz na drugi.', wiki: 'Tryl' },
 ]
 
-export const specialCards: Card[] = [
-  { id: 'beethoven', name: 'Ludwig van Beethoven', detail: '1770–1827 · Niemcy i Austria', description: 'Urodził się w Bonn, a większość dorosłego życia spędził w Wiedniu. Napisał Sonatę „Księżycową” i IX Symfonię. Komponował także wtedy, gdy niemal całkowicie stracił słuch.', wiki: 'Ludwig_van_Beethoven' },
-  { id: 'liszt', name: 'Franz Liszt', detail: '1811–1886 · Węgry', description: 'Węgierski pianista i kompozytor, który koncertował w całej Europie. Posłuchaj jego II Rapsodii węgierskiej i Sonaty h-moll. W Budapeszcie został pierwszym prezesem akademii muzycznej, która dziś nosi jego imię.', wiki: 'Ferenc_Liszt' },
-  { id: 'bach', name: 'Johann Sebastian Bach', detail: '1685–1750 · Niemcy', description: 'Pracował m.in. w Weimarze i Lipsku. Napisał Koncerty brandenburskie i zbiór Das Wohltemperierte Klavier. Był także organistą i miał dużą muzykalną rodzinę.', wiki: 'Johann_Sebastian_Bach' },
-  { id: 'tekla', name: 'Tekla Bądarzewska-Baranowska', detail: '1823–1861 · Polska', description: 'Warszawska kompozytorka, która pisała krótkie utwory na fortepian. Jej „Modlitwę dziewicy” wydawano nawet w Stanach Zjednoczonych i Australii. Posłuchaj też jej mazura „Słodkie marzenie”.', wiki: 'Tekla_Bądarzewska-Baranowska' },
-  { id: 'mozart', name: 'Wolfgang Amadeus Mozart', detail: '1756–1791 · Austria', description: 'Dorastał w Salzburgu i mieszkał w Wiedniu. Skomponował Czarodziejski flet i Eine kleine Nachtmusik. Jako dziecko koncertował w Europie razem z siostrą.', wiki: 'Wolfgang_Amadeus_Mozart' },
-  { id: 'chopin', name: 'Fryderyk Chopin', detail: '1810–1849 · Polska i Francja', description: 'Dorastał w Warszawie i przez wiele lat mieszkał w Paryżu. Posłuchaj Nokturnu Es-dur op. 9 nr 2 i Etiudy „Rewolucyjnej”. Jako dziecko komponował już polonezy.', wiki: 'Fryderyk_Chopin' },
-]
+// Stable reward-slot IDs preserve already discovered cards and their order.
+// The musical content has its own ID, used for artwork and Spotify callbacks.
+const specialRewardIds = ['beethoven', 'liszt', 'bach', 'tekla', 'mozart', 'chopin']
+export const specialCards: Card[] = musicCards.map((music, index) => ({
+  id: specialRewardIds[index],
+  name: music.title,
+  detail: `${music.composer} · ${music.date}`,
+  description: music.description,
+  wiki: '',
+  image: `/art/music/${music.id}.jpg`,
+  music,
+}))

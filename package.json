@@ -4,7 +4,7 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite --host localhost --port 5174 --strictPort",
+    "dev": "vite --host 127.0.0.1 --port 5174 --strictPort",
     "build": "tsc --noEmit && vite build",
     "preview": "bash \"Edi's Quest Log.command\"",
     "test": "TZ=Europe/Warsaw vitest run tests/unit && python3 -B -m unittest discover -s tests",

@@ -134,3 +134,39 @@ test('Mama po zalogowaniu widzi ten sam dziennik Ediego', async ({ page, openJou
   await expect(page.getByText('Jesteś na koncie Mamy i obsługujesz profil Ediego.')).toBeVisible()
   await expect(page.locator('.profile-player .xp')).toHaveText('42 XP')
 })
+
+test('album replaces composer cards while preserving all six discovered slots', async ({ page, openJournal }) => {
+  const revealed = ['beethoven', 'liszt', 'bach', 'tekla', 'mozart', 'chopin']
+  await openJournal({ revealed })
+  const album = page.locator('.album-row.special')
+  await expect(album.locator('.count')).toHaveText('6 / 6')
+  await expect(album.getByRole('button')).toHaveText(['Preludium C-dur', 'Marsz turecki', 'Dla Elizy', 'Preludium „Deszczowe”', 'Światło księżyca', 'The Entertainer'])
+  await expect(album.locator('img').first()).toHaveAttribute('src', '/art/music/bach-prelude.jpg')
+  await album.getByRole('button', { name: 'Preludium „Deszczowe”' }).click()
+  const dialog = page.getByRole('dialog')
+  await page.clock.fastForward(1200)
+  await expect(dialog.getByRole('heading')).toHaveText('Preludium „Deszczowe”')
+  await expect(dialog.getByText('Fryderyk Chopin', { exact: true })).toBeVisible()
+  await expect(dialog.getByRole('link', { name: 'Posłuchaj w Spotify' })).toHaveAttribute('href', 'https://open.spotify.com/track/0q1S9VzbiuAxPyfrxyQ26P')
+  await page.keyboard.press('Escape')
+  const saved = await page.evaluate(() => fetch('/api/journal').then(r => r.json()))
+  expect(saved.revealed).toEqual(revealed)
+})
+
+test('a completed performance discovers the first new music card and persists it', async ({ page, openJournal }) => {
+  await openJournal({
+    performances: [{ id: 'concert', title: 'Koncert', day, xp: 50, rating: '', comment: '' }],
+    completed: { concert: 50 },
+  })
+  const album = page.locator('.album-row.special')
+  await album.getByRole('button', { name: 'Odkryj kartę' }).click()
+  await page.clock.fastForward(1500)
+  await expect(page.getByRole('dialog').getByRole('heading')).toHaveText('Preludium C-dur')
+  await expect(page.getByRole('dialog').getByText('Johann Sebastian Bach', { exact: true })).toBeVisible()
+  await page.getByRole('button', { name: 'Zamknij', exact: true }).click()
+  await page.reload()
+  await expect(album.locator('.count')).toHaveText('1 / 6')
+  await expect(album.getByRole('button', { name: 'Preludium C-dur' })).toBeVisible()
+  const saved = await page.evaluate(() => fetch('/api/journal').then(r => r.json()))
+  expect(saved.revealed).toEqual(['beethoven'])
+})
