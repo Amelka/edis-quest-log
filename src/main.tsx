@@ -198,6 +198,12 @@ function EventDetails({ event, done, today, save, complete }: {
 }
 
 function App({ account, logout }: { account: Account; logout: () => Promise<void> }) {
+  const avatar = {
+    Edi: 'edi-avatar-v2.png',
+    Mama: 'edi-avatar-v2.png',
+    Tola: 'tola-avatar.png',
+    Mateusz: 'edi-avatar.png',
+  }[account]
   const [logoutError, setLogoutError] = useState(false)
   const [log, setLog] = useState(emptyLog)
   const [loaded, setLoaded] = useState(false)
@@ -382,7 +388,7 @@ function App({ account, logout }: { account: Account; logout: () => Promise<void
       <section className="panel profile" aria-labelledby="profile-heading">
         <div className="profile-summary">
           <div className="profile-player">
-            <img className="avatar" src="/art/edi-avatar-v2.png" alt="" />
+            <img className="avatar" src={'/art/' + avatar} alt="" />
             <div><div className="eyebrow">GRACZ</div><h2 id="profile-heading">{account === 'Mama' ? 'Edi' : account}</h2><strong className="xp">{xp} XP</strong></div>
             <button className="stats-trigger" disabled={!loaded} onClick={() => setModal({ kind: 'stats' })}>Statystyki</button>
           </div>
