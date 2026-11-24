@@ -82,3 +82,16 @@ Dla wdrożenia ustaw `VITE_SPOTIFY_REDIRECT_URI` na dokładny adres HTTPS
 zarejestrowany w Spotify. Lokalny launcher używa zmiennego portu, więc do testów
 Spotify używaj stałego portu Vite. Pełny streaming wymaga ręcznej próby po połączeniu konta Premium;
 testy automatyczne używają atrapy SDK.
+
+## Osobne konta online
+
+Konta `tola` i `mateusz` korzystają z osobnych dzienników, początkowo pustych.
+Konta `edi` i `mama` nadal współdzielą dotychczasowy dziennik Ediego.
+Hasła są przechowywane wyłącznie jako skróty PBKDF2 z osobnymi solami.
+
+Po ustawieniu produkcyjnego `DATABASE_URL` w środowisku i instalacji
+`requirements.txt` uruchom `python3 -B scripts/add_personal_accounts.py`.
+Skrypt pyta o hasła bez wyświetlania znaków, rozszerza schemat i tworzy konta
+w jednej transakcji. Nie nadpisuje istniejących haseł ani dzienników.
+Następnie wdróż wersję aplikacji obsługującą osobne dzienniki.
+Plik `.env.local` nie jest automatycznie ładowany przez skrypty Pythona.

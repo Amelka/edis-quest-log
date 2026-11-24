@@ -12,7 +12,7 @@ from pathlib import Path
 from tempfile import NamedTemporaryFile
 from threading import Lock
 
-from auth import ACCOUNTS, SESSION_AGE, Sessions, password_record
+from auth import ACCOUNTS, LOCAL_ACCOUNTS, SESSION_AGE, Sessions, password_record
 
 # Separate ports let both macOS accounts run the journal during fast user switching.
 PORT = 20000 + os.getuid() % 40000
@@ -74,7 +74,7 @@ def setup_accounts():
         raise RuntimeError("Uruchom dziennik w Terminalu, żeby ustawić hasła dla Ediego i Mamy.")
     accounts = {}
     print("Pierwsze uruchomienie: ustaw hasła dla kont Edi i Mama.")
-    for username, name in ACCOUNTS.items():
+    for username, name in LOCAL_ACCOUNTS.items():
         while True:
             password = getpass(f"Hasło dla konta {name} (co najmniej 8 znaków): ")
             if not 8 <= len(password) <= 256:

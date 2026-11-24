@@ -22,25 +22,41 @@ def connection():
         raise OSError("Neon database operation failed.") from error
 
 
-def read_journal():
+def journal_target(account):
+    if account in ("Edi", "Mama"):
+        return "quest_journal", "id", 1
+    if account in ("Tola", "Mateusz"):
+        return "quest_personal_journals", "username", account.casefold()
+    raise OSError("Unknown journal account.")
+
+
+def read_journal(account):
+    table, column, owner = journal_target(account)
     with connection() as db:
-        row = db.execute("SELECT current_data FROM quest_journal WHERE id = 1").fetchone()
+        row = db.execute(
+            f"SELECT current_data FROM {table} WHERE {column} = %s", (owner,),
+        ).fetchone()
         if row is None:
-            raise OSError("Journal has not been imported.")
+            raise OSError("Journal has not been initialized.")
         return bytes(row[0])
 
 
-def save_journal(data, expected_revision):
+def save_journal(data, expected_revision, account):
+    table, column, owner = journal_target(account)
     with connection() as db:
-        row = db.execute("SELECT current_data FROM quest_journal WHERE id = 1 FOR UPDATE").fetchone()
+        row = db.execute(
+            f"SELECT current_data FROM {table} WHERE {column} = %s FOR UPDATE", (owner,),
+        ).fetchone()
         if row is None:
-            raise OSError("Journal has not been imported.")
+            raise OSError("Journal has not been initialized.")
         current = bytes(row[0])
         if expected_revision != revision(current):
             return False
         if current != data:
-            db.execute("UPDATE quest_journal SET current_data = %s, previous_data = %s WHERE id = 1",
-                       (data, current))
+            db.execute(
+                f"UPDATE {table} SET current_data = %s, previous_data = %s WHERE {column} = %s",
+                (data, current, owner),
+            )
         return True
 
 

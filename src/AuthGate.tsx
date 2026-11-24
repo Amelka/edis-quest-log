@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import type { FormEvent, ReactNode } from 'react'
 import { sessionExpired } from './log'
 
-export type Account = 'Edi' | 'Mama'
+export type Account = 'Edi' | 'Mama' | 'Tola' | 'Mateusz'
 
 
 export function AuthGate({ children }: {

@@ -220,8 +220,8 @@ function checkSession(response: Response) {
   if (response.status === 401) window.dispatchEvent(new Event(sessionExpired))
 }
 
-async function readJournal(): Promise<JournalSnapshot> {
-  const response = await fetch('/api/journal', { cache: 'no-store' })
+async function readJournal(account?: string): Promise<JournalSnapshot> {
+  const response = await fetch('/api/journal', { cache: 'no-store', headers: account ? { 'X-Journal-Account': account } : {} })
   checkSession(response)
   const journalRevision = response.headers.get('X-Journal-Revision')
   const revision = journalRevision ?? response.headers.get('ETag')
@@ -230,10 +230,10 @@ async function readJournal(): Promise<JournalSnapshot> {
   return { log: await response.json(), revision, revisionHeader }
 }
 
-async function writeJournal(log: Log, { revision, revisionHeader }: JournalSnapshot) {
+async function writeJournal(log: Log, { revision, revisionHeader }: JournalSnapshot, account?: string) {
   const response = await fetch('/api/journal', {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json', [revisionHeader]: revision },
+    headers: { 'Content-Type': 'application/json', [revisionHeader]: revision, ...(account ? { 'X-Journal-Account': account } : {}) },
     body: JSON.stringify(log),
   })
   checkSession(response)
@@ -242,10 +242,10 @@ async function writeJournal(log: Log, { revision, revisionHeader }: JournalSnaps
   return true
 }
 
-export async function accessLog(change?: (log: Log) => void): Promise<Log> {
+export async function accessLog(change?: (log: Log) => void, account?: string): Promise<Log> {
   if (import.meta.env.DEV) return (await accessBrowserLog(change)) ?? structuredClone(emptyLog)
 
-  const snapshot = await readJournal()
+  const snapshot = await readJournal(account)
   const log = snapshot.log ?? structuredClone(emptyLog)
   replaceRetiredCards(log)
   if (!change) return log
@@ -253,7 +253,7 @@ export async function accessLog(change?: (log: Log) => void): Promise<Log> {
   const now = Date.now()
   if (log.timer && log.timer.deadline <= now) settleTimer(log, now)
   change(log)
-  if (!await writeJournal(log, snapshot)) {
+  if (!await writeJournal(log, snapshot, account)) {
     throw new Error('Dziennik zmienił się w innym oknie. Spróbuj zapisać ponownie.')
   }
   return log

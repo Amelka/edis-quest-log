@@ -4,7 +4,8 @@ import secrets
 import time
 from threading import Lock
 
-ACCOUNTS = {"edi": "Edi", "mama": "Mama"}
+LOCAL_ACCOUNTS = {"edi": "Edi", "mama": "Mama"}
+ACCOUNTS = {**LOCAL_ACCOUNTS, "tola": "Tola", "mateusz": "Mateusz"}
 SESSION_AGE = 12 * 60 * 60
 
 

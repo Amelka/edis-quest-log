@@ -5,10 +5,24 @@ from server import Handler
 
 
 class CloudHandler(Handler):
-    read_journal = staticmethod(cloud_store.read_journal)
-    save_journal = staticmethod(cloud_store.save_journal)
+    def account(self, token):
+        account = cloud_store.account(token)
+        # Cookies are shared across tabs. An old tab must never save its log
+        # into the account selected by a later login in another tab.
+        if self.endpoint == "journal":
+            expected = self.headers.get("X-Journal-Account")
+            if expected != account and not (expected is None and account in ("Edi", "Mama")):
+                return None
+        self.journal_account = account
+        return account
+
+    def read_journal(self):
+        return cloud_store.read_journal(self.journal_account)
+
+    def save_journal(self, data, expected_revision):
+        return cloud_store.save_journal(data, expected_revision, self.journal_account)
+
     login = staticmethod(cloud_store.login)
-    account = staticmethod(cloud_store.account)
     logout = staticmethod(cloud_store.logout)
     cookie_name = "__Secure-edi_session"
     secure_cookie = "; Secure"

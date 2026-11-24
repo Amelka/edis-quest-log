@@ -235,7 +235,7 @@ function App({ account, logout }: { account: Account; logout: () => Promise<void
 
   async function load() {
     try {
-      setLog(await accessLog())
+      setLog(await accessLog(undefined, account))
       setLoaded(true)
       setError('')
     } catch {
@@ -263,7 +263,7 @@ function App({ account, logout }: { account: Account; logout: () => Promise<void
     if (busy.current || !loaded) return
     busy.current = true
     try {
-      const state = await accessLog(change)
+      const state = await accessLog(change, account)
       setLog(state)
       setError('')
       channel.current?.postMessage('changed')
@@ -383,7 +383,7 @@ function App({ account, logout }: { account: Account; logout: () => Promise<void
         <div className="profile-summary">
           <div className="profile-player">
             <img className="avatar" src="/art/edi-avatar-v2.png" alt="" />
-            <div><div className="eyebrow">GRACZ</div><h2 id="profile-heading">Edi</h2><strong className="xp">{xp} XP</strong></div>
+            <div><div className="eyebrow">GRACZ</div><h2 id="profile-heading">{account === 'Mama' ? 'Edi' : account}</h2><strong className="xp">{xp} XP</strong></div>
             <button className="stats-trigger" disabled={!loaded} onClick={() => setModal({ kind: 'stats' })}>Statystyki</button>
           </div>
           <div className="profile-rings">

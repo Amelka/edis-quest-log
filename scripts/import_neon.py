@@ -8,7 +8,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from auth import ACCOUNTS
+from auth import LOCAL_ACCOUNTS
 from cloud_store import connection
 from server import BACKUP, CREDENTIALS, DATA, JOURNAL, lock_journal, revision
 
@@ -30,7 +30,7 @@ def snapshot():
         previous = BACKUP.read_bytes() if BACKUP.exists() else current
         validate_journal(previous)
         credentials = json.loads(CREDENTIALS.read_bytes())
-        if set(credentials) != set(ACCOUNTS):
+        if set(credentials) != set(LOCAL_ACCOUNTS):
             raise ValueError("Brakuje konta Edi lub Mama.")
         accounts = []
         for username, record in credentials.items():

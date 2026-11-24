@@ -5,7 +5,7 @@ CREATE TABLE IF NOT EXISTS quest_journal (
 );
 
 CREATE TABLE IF NOT EXISTS quest_accounts (
-    username text PRIMARY KEY CHECK (username IN ('edi', 'mama')),
+    username text PRIMARY KEY CHECK (username IN ('edi', 'mama', 'tola', 'mateusz')),
     salt text NOT NULL,
     password_digest text NOT NULL,
     failures integer NOT NULL DEFAULT 0,
@@ -16,4 +16,10 @@ CREATE TABLE IF NOT EXISTS quest_sessions (
     token_digest text PRIMARY KEY,
     username text NOT NULL REFERENCES quest_accounts (username),
     expires_at timestamptz NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS quest_personal_journals (
+    username text PRIMARY KEY REFERENCES quest_accounts (username),
+    current_data bytea NOT NULL,
+    previous_data bytea NOT NULL
 );
